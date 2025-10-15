@@ -1,12 +1,11 @@
-[default.general]
-chip = "nrf52833_xxAA" # uncomment this line for micro:bit V2
-# chip = "nrf51822_xxAA" # uncomment this line for micro:bit V1
+[default.probe]
+protocol = "Swd"
 
-[default.reset]
-halt_afterwards = false
+[default.general]
+chip = "nrf52833_xxAA"
 
 [default.rtt]
-enabled = false
+enabled = true
 
 [default.gdb]
 enabled = false

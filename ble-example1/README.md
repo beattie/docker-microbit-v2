@@ -1,57 +1,122 @@
-# Hello World
+# Setting up a development environment
 
-In the last section, you wrote a sort of "Hello World" program. But for embedded programmers, the
-"real Hello World" is to blink an LED — any LED — on and off once per second. A program that does
-this is commonly known as a "blinky".
+Dealing with microcontrollers involves several tools as we'll be dealing with an architecture
+different from your computer's and we'll have to run and debug programs on a "remote" device.
 
-Why blinky? Because this shows that you have enough control of the board you're working with to
-perform this simple task. You can get a program loaded onto the machine and running, you can find
-and turn on the appropriate pin on the MCU, you can delay for a fixed amount of time. Once you have
-this much control, other tasks become much more straightforward.
+## Documentation
 
-In previous chapters, you found out several ways to load a program onto your MB2. Now it's just a
-question of which pin you turn on and off, and how you delay between these actions.
+Tooling is not everything though. Without documentation, it is pretty much impossible to work with
+microcontrollers. The official MB2 technical documentation is at <https://tech.microbit.org>. We
+will reference other technical documentation throughout the book.
 
-Let's start by finding out how to work with the needed pins. There's a path you can follow for this
-if you know how to read electronic circuit "schematic" diagrams. You can find the [MB2 schematic],
-find an LED on that schematic that you want to turn on and off, and find what GPIO pins on the
-nRF52833 are attached to that LED. (The MB2 is a bit unusual in this regard: usually an LED is
-attached to just one pin that turns it on or off. The LED "display" on the MB2 is hooked up in a
-more complicated way to allow turning on and off combinations of LEDs at once: a feature that we
-will be using shortly.)
+## Tools
 
-[MB2 schematic]: https://github.com/microbit-foundation/microbit-v2-hardware/blob/main/V2.21/MicroBit_V2.2.1_nRF52820%20schematic.PDF
+We'll use all the tools listed below. Where a minimum version is not specified, any recent version
+should work but we have listed the version we have tested.
 
-We will work with the LED in the upper-left corner of the MB2 display. Tracing the `ROW1` and `COL1`
-wires this LED is connected to, we can see that they go to pins on the nRF52833 labeled
-`AC17`/`P0.21` and `B11`/`AIN4`/`P0.28`. Digging further through the documentation we find that
-`AC17` and `B11` are the row and column indices of the physical pins (solder balls, really) on the
-bottom of the chip — useless to us. `AIN4` just means that this pin can act as an "Analog Input",
-which is also currently useless to us. (It will come into play later.)
+- Rust 1.79.0 or a newer toolchain.
 
-This leaves `P0.21` and `P0.28`. These labels correspond to bits in the memory of the nRF52833 that
-can be turned on and off to get the LED to light up. Because electronics reasons, if pin `P0.21` is
-turned on (thus outputting 3.3V) and pin `P0.28` is turned off (thus accepting voltage) the LED will
-light up.
+- `gdb-multiarch`. This is a debugging tool. The oldest tested version is10.2, but other versions
+  will most likely work as well.  If your distribution/platform does not have `gdb-multiarch`
+  available `arm-none-eabi-gdb` will do the trick as well. Furthermore, some normal `gdb` binaries
+  are built with multiarch capabilities as well: you can find further information about this in the
+  debugging chapter of this book.
 
-But what do we do in software to cause this to occur? We will work at the level of the
-`nrf52833-hal` crate. The Hardware Abstraction Layer (HAL) is a chunk of software designed to make a
-particular microcontroller easier to work with. As can be seen from the name, we have one for the
-microcontroller on the MB2. It happens to contain everything needed to turn our target LED on.
+- [`cargo-binutils`]. Version 0.3.6 or newer.
 
-Take a look at `examples/light-up.rs` in this chapter's directory, and then try running it.
-You could use something fancy like before, but we have it set up so that
+  [`cargo-binutils`]: https://github.com/rust-embedded/cargo-binutils
 
-```
-cargo run --example light-up
-```
+- [`probe-rs-tools`]. Version 0.24.0 or newer.
 
-will load and run your program. That one LED should now be brightly lit!
+  [`probe-rs-tools`]: https://probe.rs/docs/overview/about-probe-rs/
 
-``` rust
-{{#include examples/light-up.rs}}
+- `minicom` on Linux and macOS. Tested version: 2.7.1. Other versions will most likely work as well
+  though.
+
+- `PuTTY` on Windows.
+
+Next, follow OS-agnostic installation instructions for a few of the tools:
+
+### `rustc` & Cargo
+
+Install rustup by following the instructions at [https://rustup.rs](https://rustup.rs).
+
+If you already have rustup installed, double check that you are on the stable channel and your
+stable toolchain is up-to-date. `rustc -V` should return a date and version no older than the one
+shown below:
+
+``` console
+$ rustc -V
+rustc 1.79.0 (129f3b996 2024-06-10)
 ```
 
-Note that we access the Peripheral Access Crate (PAC) for this chip through our HAL crate. There's a
-complicated dance needed to get access to our pins. Finally, since we can just initialize the pins
-to the right levels, we don't need to set them. Wiggling the pins is a topic for the next section.
+### `cargo-binutils`
+
+``` console
+$ rustup component add llvm-tools
+$ cargo install cargo-binutils --vers '^0.3'
+$ cargo size --version
+cargo-size 0.3.6
+```
+
+### `probe-rs-tools`
+
+**NOTE** If you already have old versions of `probe-run`, `probe-rs` or `cargo-embed` installed
+on your system, remove them before starting this step, as they could conceivably cause problems
+for you down the line. In particular, `probe-run` no longer officially exists. Try these as
+needed:
+
+```console
+$ cargo uninstall cargo-embed
+$ cargo uninstall probe-run
+$ cargo uninstall probe-rs
+$ cargo uninstall probe-rs-cli
+```
+
+In order to install `probe-rs-tools`, go to <https://probe.rs> and follow the current installation
+instructions there.
+
+* **NOTE** If you prefer to install `probe-rs-tools` using `cargo install`, you can try the
+  following steps.  Folks have experienced frequent failures with this approach, but you are
+  welcome to give it a go.
+
+  1. Upgrade to the most recent stable Rust.
+
+  2. Install the `probe-rs-tools` binary
+     [prerequisites](https://probe.rs/docs/getting-started/installation/).  (The linked
+     instructions are part of the more general [`probe-rs`](https://probe.rs/) embedded debugging
+     toolkit documentation.)
+
+  3. Try the install
+
+     ```console
+     $ cargo install --locked probe-rs-tools
+     ```
+
+Installing `probe-rs-tools` will install several useful tools, including `probe-rs` and
+`cargo-embed` (which is normally run as a Cargo command). Check that things are working before
+proceeding.
+
+```
+$ cargo embed --version
+cargo-embed 0.24.0 (git commit: crates.io)
+```
+
+### This repository
+
+This book also contains some small Rust codebases used in various chapters: the easiest way to use
+these is to download the book's source code. You can do this in one of the following ways:
+
+- Visit the [repository](https://github.com/rust-embedded/discovery-mb2/), click the green "Code"
+  button and then the "Download Zip" one.
+
+- Clone it using `git` (if you know `git` you presumably already have it installed) from the same
+  repository as linked in the Zip approach.
+
+### OS specific instructions
+
+Now follow the instructions specific to the OS you are using:
+
+- [Linux](linux.md)
+- [Windows](windows.md)
+- [macOS](macos.md)
