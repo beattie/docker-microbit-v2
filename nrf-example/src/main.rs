@@ -19,22 +19,23 @@ async fn main(_spawner: Spawner) {
 
     // micro:bit v2 LED matrix - Row 1, Column 1 (top-left LED)
     // To light an LED: set the ROW low and the COLUMN high
-    // Row 1 is P0.21
-    // Column 1 is P0.28
-    let mut row1 = Output::new(p.P0_21, Level::High, OutputDrive::Standard);
-    let mut col1 = Output::new(p.P0_28, Level::Low, OutputDrive::Standard);
+    //           1      2      3      4      5
+    // Row 1  P0.21, P0.22, P0.15, P0.24, P0.19
+    // Column P0.28, P0.11, P0.31, P1.05, P0.30
+    let mut rowx = Output::new(p.P0_22, Level::High, OutputDrive::Standard);
+    let mut colx = Output::new(p.P0_11, Level::Low, OutputDrive::Standard);
 
     info!("LED matrix initialized, starting blink loop");
 
     loop {
         info!("LED ON");
-        row1.set_low();   // Activate row
-        col1.set_high();  // Activate column
-        Timer::after_millis(500).await;
+        rowx.set_low();   // Activate row
+        colx.set_high();  // Activate column
+        Timer::after_millis(1000).await;
 
         info!("LED OFF");
-        row1.set_high();  // Deactivate row
-        col1.set_low();   // Deactivate column
-        Timer::after_millis(500).await;
+        rowx.set_high();  // Deactivate row
+        colx.set_low();   // Deactivate column
+        Timer::after_millis(1000).await;
     }
 }
