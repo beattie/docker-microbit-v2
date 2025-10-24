@@ -32,7 +32,7 @@ See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
 
 ## 🛠️ Hardware
 
-- **[micro:bit v2](https://microbit.org)** - Nordic nRF52833 (Cortex-M4)
+- **[micro:bit v2](https://en.wikipedia.org/wiki/Micro_Bit)** - Nordic nRF52833 (Cortex-M4)
 - **[joystick:bit](https://wiki.elecfreaks.com/en/microbit/expansion-board/joystick-bit-v2/)** - Analog joystick on P1 (X-axis) and P2 (Y-axis)
 - **USB cable** for programming
 
