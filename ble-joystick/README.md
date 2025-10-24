@@ -41,6 +41,7 @@ See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
 - **[QUICKSTART.md](QUICKSTART.md)** - 3-minute flash and test guide
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Comprehensive testing with multiple BLE apps
 - **[BLE_IMPLEMENTATION.md](BLE_IMPLEMENTATION.md)** - Architecture and implementation details
+- **[LINUX_TESTING.md](LINUX_TESTING.md)** Testing from a Linux system
 
 ## 🔧 Building
 
