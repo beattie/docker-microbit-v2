@@ -361,6 +361,9 @@ microsoft-edge ble-test.html      # Edge
 2. Select **"microbit-joy"** from popup
 3. Watch values update in real-time!
 
+### NB
+If Selecting **"microbit-joy"** with **chromium** produces _"Error: Cannot read properties of undefined (reading 'requestDevice')"_ try ```chromium --enable-features=WebBluetooth ble-test.html```
+
 **Features:**
 - ✅ Real-time X/Y values
 - ✅ Visual joystick position
