@@ -259,8 +259,9 @@ cat > ble-test.html << 'HTMLEOF'
             const dot = document.getElementById('joystickDot');
 
             // Convert 0-1023 to -135 to +135 pixels (300px diameter, leave margin)
-            const xPos = ((xValue - 512) / 512) * 135;
-            const yPos = ((yValue - 512) / 512) * 135;
+            // Axes are inverted: higher value = left/up, lower = right/down
+            const xPos = -((xValue - 512) / 512) * 135;  // Inverted: left = positive value
+            const yPos = -((yValue - 512) / 512) * 135;  // Inverted: up = positive value
 
             dot.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
         }
@@ -335,6 +336,12 @@ HTMLEOF
 
 echo "✓ HTML test page created: ble-test.html"
 ```
+
+**Note:** The visual joystick display accounts for hardware axis inversion:
+- Higher values (>512) = LEFT/UP movement
+- Lower values (<512) = RIGHT/DOWN movement
+
+The red dot will move correctly to match your physical joystick direction.
 
 ### Step 2: Open in Browser
 
