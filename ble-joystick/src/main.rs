@@ -14,8 +14,10 @@ use {defmt_rtt as _, panic_probe as _};
 // Joystick data structure for sharing between tasks
 #[derive(Clone, Copy, Debug, defmt::Format)]
 struct JoystickData {
-    x: u16,  // 0-1023 range, center at 512
-    y: u16,  // 0-1023 range, center at 512
+    x: u16,       // 0-1023 range, center at 512
+    y: u16,       // 0-1023 range, center at 512
+    button_a: u8, // 0 = released, 1 = pressed
+    button_b: u8, // 0 = released, 1 = pressed
 }
 
 // Global signal for joystick data (always latest value)
@@ -80,9 +82,12 @@ async fn joystick_read_task(
     saadc: embassy_nrf::Peri<'static, embassy_nrf::peripherals::SAADC>,
     p1: embassy_nrf::Peri<'static, embassy_nrf::peripherals::P0_03>,
     p2: embassy_nrf::Peri<'static, embassy_nrf::peripherals::P0_04>,
+    button_a: embassy_nrf::gpio::Input<'static>,
+    button_b: embassy_nrf::gpio::Input<'static>,
 ) {
     info!("✓ Joystick ADC task started");
     info!("Joystick pins: P1 (X-axis), P2 (Y-axis)");
+    info!("Buttons: A and B (from micro:bit board)");
 
     use embassy_nrf::saadc::{ChannelConfig, Config, Saadc, Resolution, Oversample};
     use embassy_nrf::bind_interrupts;
@@ -108,6 +113,7 @@ async fn joystick_read_task(
     );
 
     info!("✓ ADC channels configured");
+    info!("✓ Buttons configured (active-low with pull-up from BSP)");
     info!("Calibrating joystick center position...");
     info!("Please do not touch the joystick during calibration...");
 
@@ -154,17 +160,23 @@ async fn joystick_read_task(
 
         count += 1;
 
+        // Read button states (active-low: pressed = low = false)
+        let btn_a_pressed = !button_a.is_high();
+        let btn_b_pressed = !button_b.is_high();
+
         // Send joystick data to BLE task via signal
         let joystick_data = JoystickData {
             x: x_value,
             y: y_value,
+            button_a: btn_a_pressed as u8,
+            button_b: btn_b_pressed as u8,
         };
         JOYSTICK_SIGNAL.signal(joystick_data);
 
         // Log every 10th reading to reduce console output
         if count % 10 == 0 {
             info!(
-                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={})",
+                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={}), Btn A={}, Btn B={}",
                 count / 5,
                 x_value,
                 x_raw,
@@ -173,7 +185,9 @@ async fn joystick_read_task(
                 y_value,
                 y_raw,
                 y_delta,
-                y_centered
+                y_centered,
+                if btn_a_pressed { "PRESSED" } else { "released" },
+                if btn_b_pressed { "PRESSED" } else { "released" }
             );
 
             // Detect significant movements (threshold = 150 from center, with deadzone of 50)
@@ -198,6 +212,14 @@ async fn joystick_read_task(
                         }
                     }
                 }
+            }
+
+            // Log button press/release events
+            if btn_a_pressed {
+                info!("  🔘 Button A: PRESSED");
+            }
+            if btn_b_pressed {
+                info!("  🔘 Button B: PRESSED");
             }
         }
 
@@ -341,7 +363,7 @@ async fn main(spawner: Spawner) {
 
     // Spawn joystick reading task with ADC peripheral and pins
     info!("Spawning joystick task...");
-    match spawner.spawn(joystick_read_task(board.saadc, board.p1, board.p2)) {
+    match spawner.spawn(joystick_read_task(board.saadc, board.p1, board.p2, board.btn_a, board.btn_b)) {
         Ok(_) => info!("✓ Joystick task spawned"),
         Err(_) => error!("✗ Failed to spawn joystick task"),
     }
