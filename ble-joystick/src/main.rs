@@ -35,7 +35,7 @@ struct JoystickServer {
     joystick_service: JoystickService,
 }
 
-// Custom Joystick Service
+// Custom Joystick Service with Buttons
 #[gatt_service(uuid = "12345678-1234-5678-1234-56789abcdef0")]
 struct JoystickService {
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef1", read, notify)]
@@ -43,6 +43,12 @@ struct JoystickService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
     y_axis: u16,
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
+    button_a: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
+    button_b: u8,  // 0 = released, 1 = pressed
 }
 
 #[embassy_executor::task]
@@ -276,12 +282,16 @@ async fn advertise<'a, 'b, C: Controller>(
 async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &GattConnection<'_, '_, P>) {
     let x_char = server.joystick_service.x_axis;
     let y_char = server.joystick_service.y_axis;
+    let btn_a_char = server.joystick_service.button_a;
+    let btn_b_char = server.joystick_service.button_b;
 
     // Set initial values
     let _ = x_char.set(server, &512);
     let _ = y_char.set(server, &512);
+    let _ = btn_a_char.set(server, &0);
+    let _ = btn_b_char.set(server, &0);
 
-    info!("[BLE] Starting notification loop...");
+    info!("[BLE] Starting notification loop (joystick + buttons)...");
 
     loop {
         // Use select to handle both GATT events and joystick updates
@@ -308,8 +318,13 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
                 // Update characteristic values and notify
                 let _ = x_char.set(server, &data.x);
                 let _ = y_char.set(server, &data.y);
+                let _ = btn_a_char.set(server, &data.button_a);
+                let _ = btn_b_char.set(server, &data.button_b);
+
                 let _ = x_char.notify(conn, &data.x).await;
                 let _ = y_char.notify(conn, &data.y).await;
+                let _ = btn_a_char.notify(conn, &data.button_a).await;
+                let _ = btn_b_char.notify(conn, &data.button_b).await;
             }
         }
     }
