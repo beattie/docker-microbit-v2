@@ -2,8 +2,11 @@
 
 The goal of this repository is to develop BLE examples for the [micro:bit v2](https://microbit.org) and the [joystick:bit](https://wiki.elecfreaks.com/en/microbit/expansion-board/joystick-bit-v2/).
 
-A self-contained **Docker-based development environment** for building and running **Rust programs** on the **BBC micro:bit v2** (powered by the Nordic nRF52833).  These examples are based on examples from the [_Rust Embedded Discovery Book_](https://rust-embedded.github.io/discovery/microbit/index.html), including `03-setup` and `06-hello-world`.
+A self-contained **Docker-based development environment** for building and running **Rust programs** on the **BBC micro:bit v2** (powered by the Nordic nRF52833).  These examples are based on examples from the [_Rust Embedded Discovery Book_](https://rust-embedded.github.io/discovery/microbit/index.html), including `03-setup` and `06-hello-world`
 `ble-example1` is extended from `03-setup` with input from `claude.ai` .
+The `ble-advertising` project is a stepping stone to understanding BLE, while `ble-joystick` is a complete application demonstrating production BLE patterns with real sensor data.
+
+The branch `HID_buttons` includes reading some _buttons_ and reporting them via **BLE**.
 
 ## 🐳 Quick Start
 🖥️ Ubuntu Host Requirements
