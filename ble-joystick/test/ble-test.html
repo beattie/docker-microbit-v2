@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>micro:bit Joystick + Buttons Test</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            color: #333;
+            text-align: center;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        #connectBtn {
+            width: 100%;
+            padding: 18px;
+            font-size: 18px;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 20px;
+        }
+
+        #connectBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        #connectBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #status {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .status-disconnected {
+            background: #fee;
+            color: #c33;
+        }
+
+        .status-connected {
+            background: #efe;
+            color: #3c3;
+        }
+
+        .status-connecting {
+            background: #ffeaa7;
+            color: #d63031;
+        }
+
+        .joystick-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+        }
+
+        .joystick-visual {
+            width: 300px;
+            height: 300px;
+            background: #e9ecef;
+            border-radius: 50%;
+            margin: 20px auto;
+            position: relative;
+            border: 4px solid #dee2e6;
+        }
+
+        .crosshair {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 2px;
+            height: 100%;
+            background: #adb5bd;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair-h {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 2px;
+            background: #adb5bd;
+            transform: translate(-50%, -50%);
+        }
+
+        .joystick-dot {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transition: all 0.1s ease-out;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+            border: 3px solid white;
+        }
+
+        .values {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .value-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .value-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 5px;
+        }
+
+        .value-number {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+            font-family: 'Courier New', monospace;
+        }
+
+        .buttons-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+        }
+
+        .buttons-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .button-display {
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.2s;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 3px solid #dee2e6;
+        }
+
+        .button-display.pressed {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+            border-color: #667eea;
+        }
+
+        .button-label {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .button-status {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: #856404;
+        }
+
+        .note strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 micro:bit Gamepad</h1>
+        <p class="subtitle">Joystick + Button BLE Test</p>
+
+        <button id="connectBtn">Connect to micro:bit</button>
+
+        <div id="status" class="status-disconnected">
+            Disconnected
+        </div>
+
+        <div class="joystick-container">
+            <div class="section-title">📍 Joystick Position</div>
+
+            <div class="joystick-visual">
+                <div class="crosshair"></div>
+                <div class="crosshair-h"></div>
+                <div class="joystick-dot" id="joystickDot"></div>
+            </div>
+
+            <div class="values">
+                <div class="value-box">
+                    <div class="value-label">X-Axis</div>
+                    <div class="value-number" id="xValue">512</div>
+                </div>
+                <div class="value-box">
+                    <div class="value-label">Y-Axis</div>
+                    <div class="value-number" id="yValue">512</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="buttons-container">
+            <div class="section-title">🔘 Buttons</div>
+
+            <div class="buttons-grid">
+                <div class="button-display" id="buttonADisplay">
+                    <div class="button-label">Button A</div>
+                    <div class="button-status">Released</div>
+                </div>
+                <div class="button-display" id="buttonBDisplay">
+                    <div class="button-label">Button B</div>
+                    <div class="button-status">Released</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="note">
+            <strong>Note for Chromium users:</strong>
+            If you get an error, try launching Chromium with:<br>
+            <code>chromium --enable-features=WebBluetooth ble-test.html</code>
+        </div>
+    </div>
+
+    <script>
+        const SERVICE_UUID = '12345678-1234-5678-1234-56789abcdef0';
+        const X_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef1';
+        const Y_CHAR_UUID = '12345678-1234-5678-1234-56789abcdef2';
+        const BTN_A_UUID = '12345678-1234-5678-1234-56789abcdef3';
+        const BTN_B_UUID = '12345678-1234-5678-1234-56789abcdef4';
+
+        let device = null;
+        let server = null;
+
+        const connectBtn = document.getElementById('connectBtn');
+        const statusDiv = document.getElementById('status');
+        const xValueSpan = document.getElementById('xValue');
+        const yValueSpan = document.getElementById('yValue');
+        const joystickDot = document.getElementById('joystickDot');
+        const buttonADisplay = document.getElementById('buttonADisplay');
+        const buttonBDisplay = document.getElementById('buttonBDisplay');
+
+        function updateStatus(message, className) {
+            statusDiv.textContent = message;
+            statusDiv.className = className;
+        }
+
+        function updateJoystickVisual(x, y) {
+            // Convert 0-1023 range to -135 to +135 pixels (center = 512)
+            // Axes are inverted: higher value = left/up, lower = right/down
+            const xPos = -((x - 512) / 512) * 135;  // Inverted
+            const yPos = -((y - 512) / 512) * 135;  // Inverted
+
+            joystickDot.style.transform = `translate(calc(-50% + ${xPos}px), calc(-50% + ${yPos}px))`;
+        }
+
+        function updateButtonDisplay(element, pressed) {
+            if (pressed) {
+                element.classList.add('pressed');
+                element.querySelector('.button-status').textContent = 'PRESSED';
+            } else {
+                element.classList.remove('pressed');
+                element.querySelector('.button-status').textContent = 'Released';
+            }
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            try {
+                updateStatus('Connecting...', 'status-connecting');
+                connectBtn.disabled = true;
+
+                // Request device
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'microbit-joy' }],
+                    optionalServices: [SERVICE_UUID]
+                });
+
+                // Connect to GATT server
+                updateStatus('Connecting to GATT server...', 'status-connecting');
+                server = await device.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+
+                // Get characteristics
+                const xChar = await service.getCharacteristic(X_CHAR_UUID);
+                const yChar = await service.getCharacteristic(Y_CHAR_UUID);
+                const btnAChar = await service.getCharacteristic(BTN_A_UUID);
+                const btnBChar = await service.getCharacteristic(BTN_B_UUID);
+
+                // Read initial values
+                const xValue = await xChar.readValue();
+                const yValue = await yChar.readValue();
+                const aValue = await btnAChar.readValue();
+                const bValue = await btnBChar.readValue();
+
+                const x = xValue.getUint16(0, true);
+                const y = yValue.getUint16(0, true);
+                const btnA = aValue.getUint8(0);
+                const btnB = bValue.getUint8(0);
+
+                xValueSpan.textContent = x;
+                yValueSpan.textContent = y;
+                updateJoystickVisual(x, y);
+                updateButtonDisplay(buttonADisplay, btnA === 1);
+                updateButtonDisplay(buttonBDisplay, btnB === 1);
+
+                // Subscribe to notifications
+                xChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const x = e.target.value.getUint16(0, true);
+                    xValueSpan.textContent = x;
+                    const y = parseInt(yValueSpan.textContent);
+                    updateJoystickVisual(x, y);
+                });
+                await xChar.startNotifications();
+
+                yChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const y = e.target.value.getUint16(0, true);
+                    yValueSpan.textContent = y;
+                    const x = parseInt(xValueSpan.textContent);
+                    updateJoystickVisual(x, y);
+                });
+                await yChar.startNotifications();
+
+                btnAChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const pressed = e.target.value.getUint8(0) === 1;
+                    updateButtonDisplay(buttonADisplay, pressed);
+                });
+                await btnAChar.startNotifications();
+
+                btnBChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const pressed = e.target.value.getUint8(0) === 1;
+                    updateButtonDisplay(buttonBDisplay, pressed);
+                });
+                await btnBChar.startNotifications();
+
+                updateStatus('✅ Connected!', 'status-connected');
+                connectBtn.textContent = 'Connected';
+
+                // Handle disconnection
+                device.addEventListener('gattserverdisconnected', () => {
+                    updateStatus('Disconnected', 'status-disconnected');
+                    connectBtn.textContent = 'Connect to micro:bit';
+                    connectBtn.disabled = false;
+                });
+
+            } catch (error) {
+                console.error('Error:', error);
+                updateStatus(`Error: ${error.message}`, 'status-disconnected');
+                connectBtn.textContent = 'Connect to micro:bit';
+                connectBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
