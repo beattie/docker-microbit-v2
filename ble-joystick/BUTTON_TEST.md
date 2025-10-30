@@ -69,10 +69,10 @@ Joy 8: X=512 Y=512 Btn A=PRESSED, Btn B=PRESSED
 
 ```bash
 # Open test page in browser
-chromium --enable-features=WebBluetooth ble-test.html
+chromium --enable-features=WebBluetooth test/ble-test.html
 
 # Or with Firefox (Web Bluetooth enabled by default)
-firefox ble-test.html
+firefox test/ble-test.html
 ```
 
 **Steps:**
@@ -110,7 +110,7 @@ cargo run --release
 
 **Objective:** Verify joystick notifications
 
-1. Open `ble-test.html` in browser
+1. Open `test/ble-test.html` in browser
 2. Connect to micro:bit
 3. Move joystick in all directions
 
@@ -129,7 +129,7 @@ cargo run --release
 
 **Objective:** Verify button notifications
 
-With `ble-test.html` connected:
+With `test/ble-test.html` connected:
 
 **Test Cases:**
 - [ ] Button A released → White background, "Released"
@@ -168,7 +168,7 @@ With `ble-test.html` connected:
 
 **Chromium/Chrome:**
 ```bash
-chromium --enable-features=WebBluetooth ble-test.html
+chromium --enable-features=WebBluetooth test/ble-test.html
 ```
 
 **Firefox:** Web Bluetooth should work by default (recent versions)
@@ -263,29 +263,21 @@ console.log(device.gatt.connected);  // Should be true
 
 ### **Option A: Python Test Script**
 
-Create `test_buttons.py`:
-```python
-#!/usr/bin/env python3
-import asyncio
-from bleak import BleakScanner, BleakClient
+Use the provided `test/test_buttons.py` script:
 
-BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"
-BTN_B_UUID = "12345678-1234-5678-1234-56789abcdef4"
+```bash
+# Install dependencies
+pip install bleak
 
-def button_handler(sender, data):
-    pressed = data[0] == 1
-    button = "A" if sender.uuid == BTN_A_UUID else "B"
-    print(f"Button {button}: {'PRESSED' if pressed else 'released'}")
-
-async def main():
-    device = await BleakScanner.find_device_by_name("microbit-joy")
-    async with BleakClient(device) as client:
-        await client.start_notify(BTN_A_UUID, button_handler)
-        await client.start_notify(BTN_B_UUID, button_handler)
-        await asyncio.sleep(60)  # Monitor for 60 seconds
-
-asyncio.run(main())
+# Run the test script
+python3 test/test_buttons.py
 ```
+
+The script will:
+- Scan for "microbit-joy" device
+- Connect and read initial values
+- Subscribe to all 4 characteristics
+- Display real-time joystick and button updates
 
 ### **Option B: HID-over-GATT**
 
@@ -337,4 +329,4 @@ You've successfully implemented button BLE support when:
 
 ---
 
-**Ready to test?** Flash the firmware and open `ble-test.html`! 🚀
+**Ready to test?** Flash the firmware and open `test/ble-test.html`! 🚀
