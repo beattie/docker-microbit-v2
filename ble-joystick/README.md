@@ -4,11 +4,12 @@ A Bluetooth Low Energy (BLE) joystick implementation for the micro:bit v2, sendi
 
 ## 🎮 Features
 
-- **Real-time BLE Notifications**: Joystick X/Y values transmitted at 10Hz
+- **Real-time BLE Notifications**: Joystick X/Y + Button A/B transmitted at 10Hz
+- **6 Input Channels**: 2 analog axes + 2 buttons (expandable to 6 buttons)
 - **Custom GATT Service**: Standard BLE service with read and notify characteristics
 - **Auto-calibration**: Centers joystick position on startup
 - **Concurrent Tasks**: LED indicators, joystick reading, and BLE operations run simultaneously
-- **Low Memory**: ~143KB flash, ~44KB RAM
+- **Low Memory**: ~140KB flash, ~43KB RAM
 - **Production Ready**: Based on official microbit-bsp examples
 
 ## 🚀 Quick Start
@@ -22,13 +23,24 @@ See [QUICKSTART.md](QUICKSTART.md) for complete 3-minute setup guide.
 
 ## 📱 Testing
 
+**Web Bluetooth (Chromium/Firefox):**
+```bash
+chromium --enable-features=WebBluetooth test/ble-test.html
+```
+
+**Python Script:**
+```bash
+pip install bleak
+python3 test/test_buttons.py
+```
+
 **On your smartphone:**
 1. Install nRF Connect (Android/iOS) or LightBlue (iOS)
 2. Scan for "microbit-joy"
 3. Connect and enable notifications
-4. Move joystick → Watch values update!
+4. Move joystick and press buttons → Watch values update!
 
-See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
+See [BUTTON_TEST.md](BUTTON_TEST.md) for complete testing guide.
 
 ## 🛠️ Hardware
 
@@ -39,9 +51,12 @@ See [TESTING_GUIDE.md](TESTING_GUIDE.md) for detailed testing instructions.
 ## 📚 Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 3-minute flash and test guide
+- **[BUTTON_TEST.md](BUTTON_TEST.md)** - Button + joystick testing guide
+- **[JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md)** - Add 4 more buttons, buzzer, vibration motor
+- **[GATT.md](GATT.md)** - Complete GATT implementation guide
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Comprehensive testing with multiple BLE apps
 - **[BLE_IMPLEMENTATION.md](BLE_IMPLEMENTATION.md)** - Architecture and implementation details
-- **[LINUX_TESTING.md](LINUX_TESTING.md)** Testing from a Linux system
+- **[LINUX_TESTING.md](LINUX_TESTING.md)** - Testing from a Linux system
 
 ## 🔧 Building
 
@@ -87,12 +102,16 @@ Hardware Layer          Application Layer         BLE Layer
 **Service UUID**: `12345678-1234-5678-1234-56789abcdef0`
 
 **Characteristics:**
-| Characteristic | UUID | Properties | Type | Range |
-|---------------|------|------------|------|-------|
+| Characteristic | UUID | Properties | Type | Range/Values |
+|---------------|------|------------|------|--------------|
 | X-Axis | `...def1` | Read, Notify | u16 | 0-1023 |
 | Y-Axis | `...def2` | Read, Notify | u16 | 0-1023 |
+| Button A | `...def3` | Read, Notify | u8 | 0=released, 1=pressed |
+| Button B | `...def4` | Read, Notify | u8 | 0=released, 1=pressed |
 
 **Center Position**: X=512, Y=512 (calibrated at startup)
+
+**Expansion Ready**: See [JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md) to add buttons C, D, E, F + buzzer + vibration
 
 ## 🧩 Dependencies
 
@@ -105,10 +124,11 @@ See [Cargo.toml](Cargo.toml) for complete dependency list.
 
 ## 📈 Performance
 
-- **Flash Usage**: 143KB / 512KB (28%)
-- **RAM Usage**: 44KB / 128KB (34%)
+- **Flash Usage**: 140KB / 512KB (27%)
+- **RAM Usage**: 43KB / 128KB (34%)
 - **Update Rate**: 10Hz (100ms interval)
-- **BLE Latency**: ~50-100ms typical
+- **BLE Latency**: ~30-50ms typical
+- **Button Latency**: ~10ms to RTT, ~30-50ms to BLE
 
 ## 🎯 Project Status
 
@@ -117,17 +137,20 @@ See [Cargo.toml](Cargo.toml) for complete dependency list.
 - [x] Automatic center calibration
 - [x] BLE advertising and connection handling
 - [x] Custom GATT service with notifications
-- [x] Real-time data streaming
+- [x] Real-time data streaming (joystick + buttons)
+- [x] Button A/B press detection
 - [x] LED visual feedback
+- [x] Web Bluetooth test interface
+- [x] Python test script
 - [x] Comprehensive documentation
 
-🚧 **Potential Enhancements:**
+🚧 **Ready to Add:** (See [JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md))
+- [ ] 4 additional buttons (C, D, E, F on P12-P15)
+- [ ] Buzzer support (P0 with PWM)
+- [ ] Vibration motor (P16 for haptic feedback)
 - [ ] HID-over-GATT (standard gamepad support)
-- [ ] Button press detection
 - [ ] Battery level reporting
-- [ ] Connection status LED
 - [ ] Configurable sensitivity
-- [ ] Mobile app example
 
 ## 🤝 Contributing
 
@@ -148,8 +171,9 @@ MIT or Apache-2.0 (your choice)
 
 Having issues? Check:
 1. [QUICKSTART.md](QUICKSTART.md) - Quick reference
-2. [TESTING_GUIDE.md](TESTING_GUIDE.md) - Troubleshooting section
-3. [BLE_IMPLEMENTATION.md](BLE_IMPLEMENTATION.md) - Technical details
+2. [BUTTON_TEST.md](BUTTON_TEST.md) - Testing and troubleshooting
+3. [TESTING_GUIDE.md](TESTING_GUIDE.md) - Additional testing methods
+4. [BLE_IMPLEMENTATION.md](BLE_IMPLEMENTATION.md) - Technical details
 
 ---
 
