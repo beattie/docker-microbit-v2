@@ -52,7 +52,7 @@ See [BUTTON_TEST.md](BUTTON_TEST.md) for complete testing guide.
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 3-minute flash and test guide
 - **[BUTTON_TEST.md](BUTTON_TEST.md)** - Button + joystick testing guide
-- **[JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md)** - Add 4 more buttons, buzzer, vibration motor
+- **[JOYSTICK_BIT_EXERCISE.md](JOYSTICK_BIT_EXERCISE.md)** - Add 4 more buttons, buzzer, vibration motor
 - **[GATT.md](GATT.md)** - Complete GATT implementation guide
 - **[TESTING_GUIDE.md](TESTING_GUIDE.md)** - Comprehensive testing with multiple BLE apps
 - **[BLE_IMPLEMENTATION.md](BLE_IMPLEMENTATION.md)** - Architecture and implementation details
@@ -111,7 +111,7 @@ Hardware Layer          Application Layer         BLE Layer
 
 **Center Position**: X=512, Y=512 (calibrated at startup)
 
-**Expansion Ready**: See [JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md) to add buttons C, D, E, F + buzzer + vibration
+**Expansion Ready**: See [JOYSTICK_BIT_EXERCISE.md](JOYSTICK_BIT_EXERCISE.md) to add buttons C, D, E, F + buzzer + vibration
 
 ## 🧩 Dependencies
 
@@ -144,7 +144,7 @@ See [Cargo.toml](Cargo.toml) for complete dependency list.
 - [x] Python test script
 - [x] Comprehensive documentation
 
-🚧 **Ready to Add:** (See [JOYSTICK_BIT_EXPANSION.md](JOYSTICK_BIT_EXPANSION.md))
+🚧 **Ready to Add:** (See [JOYSTICK_BIT_EXERCISE.md](JOYSTICK_BIT_EXERCISE.md))
 - [ ] 4 additional buttons (C, D, E, F on P12-P15)
 - [ ] Buzzer support (P0 with PWM)
 - [ ] Vibration motor (P16 for haptic feedback)
