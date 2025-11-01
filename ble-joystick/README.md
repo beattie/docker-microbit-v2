@@ -23,12 +23,20 @@ See [QUICKSTART.md](QUICKSTART.md) for complete 3-minute setup guide.
 
 ## 📱 Testing
 
-**Web Bluetooth (Chromium/Firefox):**
+**Python GUI (⭐ Recommended - works on all platforms):**
 ```bash
-chromium --enable-features=WebBluetooth test/ble-test.html
+pip install bleak
+python3 test/gui_test.py
 ```
 
-**Python Script:**
+**Web Bluetooth (Chrome/Chromium/Edge only - Firefox NOT supported):**
+```bash
+cd test/
+./serve.sh
+# Then open in Chrome: http://localhost:8000/ble-test.html
+```
+
+**Python Console Script:**
 ```bash
 pip install bleak
 python3 test/test_buttons.py

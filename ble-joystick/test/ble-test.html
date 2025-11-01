@@ -312,6 +312,29 @@
         const buttonADisplay = document.getElementById('buttonADisplay');
         const buttonBDisplay = document.getElementById('buttonBDisplay');
 
+        // Check if Web Bluetooth is available
+        if (!navigator.bluetooth) {
+            updateStatus('❌ Web Bluetooth not available', 'status-disconnected');
+            connectBtn.disabled = true;
+
+            // Check if it's because of file:// protocol
+            if (window.location.protocol === 'file:') {
+                statusDiv.innerHTML = '❌ Web Bluetooth requires HTTP/HTTPS<br><br>' +
+                    '<strong>Solution:</strong> Serve this file with:<br>' +
+                    '<code>python3 -m http.server 8000</code><br>' +
+                    'Then open: <code>http://localhost:8000/ble-test.html</code>';
+            } else {
+                statusDiv.innerHTML = '❌ Web Bluetooth not supported in this browser<br><br>' +
+                    '<strong>Firefox does NOT support Web Bluetooth</strong><br><br>' +
+                    'Please use one of these browsers:<br>' +
+                    '• <strong>Chrome/Chromium</strong> (recommended)<br>' +
+                    '• <strong>Microsoft Edge</strong><br>' +
+                    '• <strong>Opera</strong><br><br>' +
+                    'Or use the Python test script instead:<br>' +
+                    '<code>python3 test_buttons.py</code>';
+            }
+        }
+
         function updateStatus(message, className) {
             statusDiv.textContent = message;
             statusDiv.className = className;

@@ -67,12 +67,20 @@ Joy 8: X=512 Y=512 Btn A=PRESSED, Btn B=PRESSED
 
 ### **3. Test with Web Bluetooth**
 
-```bash
-# Open test page in browser
-chromium --enable-features=WebBluetooth test/ble-test.html
+**⚠️ IMPORTANT:**
+- Web Bluetooth requires HTTP/HTTPS, not file:// protocol
+- **Firefox NOT supported** - use Chrome/Chromium/Edge
 
-# Or with Firefox (Web Bluetooth enabled by default)
-firefox test/ble-test.html
+```bash
+# Step 1: Start HTTP server
+cd test/
+./serve.sh
+
+# Step 2: Open in Chrome/Chromium
+google-chrome http://localhost:8000/ble-test.html
+
+# Or Edge
+microsoft-edge http://localhost:8000/ble-test.html
 ```
 
 **Steps:**
@@ -106,7 +114,41 @@ cargo run --release
 
 ---
 
-### **Test 2: Web Bluetooth (Joystick Only)**
+### **Test 2: Python GUI (⭐ Recommended)**
+
+**Objective:** Visual testing with graphical interface
+
+```bash
+# Install dependencies (if not already installed)
+pip install bleak
+
+# Run GUI application
+python3 test/gui_test.py
+```
+
+**Test Cases:**
+- [ ] GUI window opens successfully
+- [ ] Click "Connect to micro:bit" → Connection succeeds
+- [ ] Status shows "✅ Connected!"
+- [ ] Joystick center → Dot in center of circle, X=512, Y=512
+- [ ] Move joystick → Dot follows movement smoothly
+- [ ] Press Button A → Button turns purple, shows "PRESSED"
+- [ ] Release Button A → Button returns to white, shows "Released"
+- [ ] Press Button B → Button turns purple, shows "PRESSED"
+- [ ] Release Button B → Button returns to white, shows "Released"
+- [ ] Press both buttons → Both show "PRESSED" simultaneously
+- [ ] Move joystick while pressing buttons → All update correctly
+- [ ] Click "Disconnect" → Connection closes gracefully
+
+**Advantages:**
+- ✅ Works on all platforms (Linux, macOS, Windows)
+- ✅ No browser required
+- ✅ No Firefox compatibility issues
+- ✅ Visual feedback with animations
+
+---
+
+### **Test 3: Web Bluetooth (Joystick Only)**
 
 **Objective:** Verify joystick notifications
 
@@ -125,7 +167,7 @@ cargo run --release
 
 ---
 
-### **Test 3: Web Bluetooth (Buttons)**
+### **Test 4: Web Bluetooth (Buttons)**
 
 **Objective:** Verify button notifications
 
@@ -142,7 +184,7 @@ With `test/ble-test.html` connected:
 
 ---
 
-### **Test 4: Combined (Joystick + Buttons)**
+### **Test 5: Combined (Joystick + Buttons)**
 
 **Objective:** Verify everything works simultaneously
 
@@ -162,18 +204,29 @@ With `test/ble-test.html` connected:
 
 **Symptoms:**
 - "navigator.bluetooth is undefined"
+- "Web Bluetooth not supported in this browser"
 - Can't see device list
 
 **Solutions:**
 
-**Chromium/Chrome:**
+**1. Check if using Firefox:**
+- ❌ **Firefox does NOT support Web Bluetooth** (Mozilla's policy decision)
+- ✅ **Use Chrome, Chromium, or Edge instead**
+
+**2. Use HTTP/HTTPS protocol:**
 ```bash
-chromium --enable-features=WebBluetooth test/ble-test.html
+cd test/
+./serve.sh
+# Then open: http://localhost:8000/ble-test.html
 ```
 
-**Firefox:** Web Bluetooth should work by default (recent versions)
-
-**Edge:** Should work by default on Windows
+**3. Supported browsers:**
+- ✅ Chrome/Chromium (recommended)
+- ✅ Microsoft Edge
+- ✅ Opera
+- ✅ Brave
+- ❌ Firefox (not supported)
+- ❌ Safari (limited support)
 
 ---
 

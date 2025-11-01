@@ -4,17 +4,75 @@ This directory contains test utilities for the micro:bit BLE joystick + button p
 
 ## Files
 
-### `ble-test.html`
-Web Bluetooth test interface with visual joystick and button display.
+### `gui_test.py` ⭐ Recommended
+Python GUI application with visual joystick and button display (works on all platforms).
+
+**Setup:**
+```bash
+pip install bleak
+```
 
 **Usage:**
 ```bash
-# Chromium (requires flag)
-chromium --enable-features=WebBluetooth ble-test.html
-
-# Firefox (works by default)
-firefox ble-test.html
+python3 gui_test.py
+# or
+./gui_test.py
 ```
+
+**Features:**
+- ✅ Works on **all platforms** (Linux, macOS, Windows)
+- ✅ No browser required
+- ✅ Visual joystick position display
+- ✅ Button press indicators with animations
+- ✅ Real-time BLE notifications
+- ✅ Easy connect/disconnect
+
+**Screenshot:**
+```
+┌─────────────────────────────────┐
+│    🎮 micro:bit Gamepad         │
+│   Joystick + Button BLE Test    │
+├─────────────────────────────────┤
+│  [Connect to micro:bit]         │
+│  Status: Connected ✅           │
+├─────────────────────────────────┤
+│   📍 Joystick Position          │
+│      [Visual circle display]    │
+│   X-AXIS: 512  Y-AXIS: 512      │
+├─────────────────────────────────┤
+│   🔘 Buttons                    │
+│  [Button A]    [Button B]       │
+│   Released      Released        │
+└─────────────────────────────────┘
+```
+
+---
+
+### `ble-test.html`
+Web Bluetooth test interface with visual joystick and button display.
+
+**⚠️ IMPORTANT:**
+- Web Bluetooth requires HTTP/HTTPS protocol, not `file://`
+- **Firefox does NOT support Web Bluetooth** (use Chrome/Chromium/Edge instead)
+
+**Usage:**
+```bash
+# Step 1: Start local HTTP server
+cd test/
+./serve.sh
+
+# Step 2: Open in a supported browser
+# Chrome/Chromium (recommended):
+google-chrome http://localhost:8000/ble-test.html
+
+# Or Microsoft Edge:
+microsoft-edge http://localhost:8000/ble-test.html
+
+# Or Opera:
+opera http://localhost:8000/ble-test.html
+```
+
+**❌ Firefox NOT supported:** Mozilla does not implement Web Bluetooth API
 
 **Features:**
 - Real-time joystick position visualization
