@@ -23,6 +23,34 @@ struct JoystickData {
 // Global signal for joystick data (always latest value)
 static JOYSTICK_SIGNAL: Signal<ThreadModeRawMutex, JoystickData> = Signal::new();
 
+// Vibration pattern commands
+#[derive(Clone, Copy, Debug, defmt::Format)]
+enum VibrationPattern {
+    Off,        // 0: No vibration
+    Short,      // 1: 50ms pulse
+    Medium,     // 2: 150ms pulse
+    Long,       // 3: 300ms pulse
+    Double,     // 4: Two 50ms pulses
+    Triple,     // 5: Three 50ms pulses
+}
+
+impl VibrationPattern {
+    fn from_u8(value: u8) -> Self {
+        match value {
+            0 => VibrationPattern::Off,
+            1 => VibrationPattern::Short,
+            2 => VibrationPattern::Medium,
+            3 => VibrationPattern::Long,
+            4 => VibrationPattern::Double,
+            5 => VibrationPattern::Triple,
+            _ => VibrationPattern::Off,
+        }
+    }
+}
+
+// Global signal for vibration commands
+static VIBRATION_SIGNAL: Signal<ThreadModeRawMutex, VibrationPattern> = Signal::new();
+
 // Max number of connections
 const CONNECTIONS_MAX: usize = 1;
 
@@ -35,7 +63,7 @@ struct JoystickServer {
     joystick_service: JoystickService,
 }
 
-// Custom Joystick Service with Buttons
+// Custom Joystick Service with Buttons and Vibration
 #[gatt_service(uuid = "12345678-1234-5678-1234-56789abcdef0")]
 struct JoystickService {
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef1", read, notify)]
@@ -49,6 +77,9 @@ struct JoystickService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
     button_b: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdefa", write)]
+    vibration_control: u8,  // 0=off, 1=short, 2=medium, 3=long, 4=double, 5=triple
 }
 
 #[embassy_executor::task]
@@ -80,6 +111,66 @@ async fn led_blink_task(mut display: display::LedMatrix<embassy_nrf::gpio::Outpu
     loop {
         display.display(top_row, Duration::from_millis(500)).await;
         display.display(all_off, Duration::from_millis(500)).await;
+    }
+}
+
+#[embassy_executor::task]
+async fn vibration_task(mut vibration_pin: embassy_nrf::gpio::Output<'static>) {
+    info!("✓ Vibration motor task started (P16)");
+    info!("Motor is ACTIVE-LOW: LOW=ON, HIGH=OFF");
+    info!("Patterns: 0=off, 1=short(50ms), 2=medium(150ms), 3=long(300ms), 4=double, 5=triple");
+
+    loop {
+        // Wait for vibration command
+        let pattern = VIBRATION_SIGNAL.wait().await;
+
+        info!("🔊 Vibration pattern: {:?}", pattern);
+
+        match pattern {
+            VibrationPattern::Off => {
+                vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                info!("  → Motor OFF");
+            }
+            VibrationPattern::Short => {
+                vibration_pin.set_low();   // INVERTED: LOW = motor ON
+                Timer::after(Duration::from_millis(50)).await;
+                vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                info!("  → Short pulse (50ms)");
+            }
+            VibrationPattern::Medium => {
+                vibration_pin.set_low();   // INVERTED: LOW = motor ON
+                Timer::after(Duration::from_millis(150)).await;
+                vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                info!("  → Medium pulse (150ms)");
+            }
+            VibrationPattern::Long => {
+                vibration_pin.set_low();   // INVERTED: LOW = motor ON
+                Timer::after(Duration::from_millis(300)).await;
+                vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                info!("  → Long pulse (300ms)");
+            }
+            VibrationPattern::Double => {
+                for _ in 0..2 {
+                    vibration_pin.set_low();   // INVERTED: LOW = motor ON
+                    Timer::after(Duration::from_millis(50)).await;
+                    vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                    Timer::after(Duration::from_millis(50)).await;
+                }
+                info!("  → Double pulse (2x 50ms)");
+            }
+            VibrationPattern::Triple => {
+                for _ in 0..3 {
+                    vibration_pin.set_low();   // INVERTED: LOW = motor ON
+                    Timer::after(Duration::from_millis(50)).await;
+                    vibration_pin.set_high();  // INVERTED: HIGH = motor OFF
+                    Timer::after(Duration::from_millis(50)).await;
+                }
+                info!("  → Triple pulse (3x 50ms)");
+            }
+        }
+
+        // Ensure motor is off after pattern (INVERTED: HIGH = OFF)
+        vibration_pin.set_high();
     }
 }
 
@@ -144,6 +235,10 @@ async fn joystick_read_task(
     let mut buf = [0i16; 2];
     let mut count = 0u32;
 
+    // Track previous button states for edge detection (haptic feedback)
+    let mut btn_a_prev = false;
+    let mut btn_b_prev = false;
+
     loop {
         // Read both ADC channels
         adc.sample(&mut buf).await;
@@ -169,6 +264,20 @@ async fn joystick_read_task(
         // Read button states (active-low: pressed = low = false)
         let btn_a_pressed = !button_a.is_high();
         let btn_b_pressed = !button_b.is_high();
+
+        // Haptic feedback on button press (rising edge detection)
+        if btn_a_pressed && !btn_a_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            info!("  🔊 Haptic feedback: Button A pressed");
+        }
+        if btn_b_pressed && !btn_b_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            info!("  🔊 Haptic feedback: Button B pressed");
+        }
+
+        // Update previous button states
+        btn_a_prev = btn_a_pressed;
+        btn_b_prev = btn_b_pressed;
 
         // Send joystick data to BLE task via signal
         let joystick_data = JoystickData {
@@ -284,14 +393,18 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
     let y_char = server.joystick_service.y_axis;
     let btn_a_char = server.joystick_service.button_a;
     let btn_b_char = server.joystick_service.button_b;
+    let vibration_char = server.joystick_service.vibration_control;
 
     // Set initial values
     let _ = x_char.set(server, &512);
     let _ = y_char.set(server, &512);
     let _ = btn_a_char.set(server, &0);
     let _ = btn_b_char.set(server, &0);
+    let _ = vibration_char.set(server, &0);
 
-    info!("[BLE] Starting notification loop (joystick + buttons)...");
+    info!("[BLE] Starting notification loop (joystick + buttons + vibration)...");
+
+    let mut prev_vibration_value = 0u8;
 
     loop {
         // Use select to handle both GATT events and joystick updates
@@ -325,6 +438,22 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
                 let _ = y_char.notify(conn, &data.y).await;
                 let _ = btn_a_char.notify(conn, &data.button_a).await;
                 let _ = btn_b_char.notify(conn, &data.button_b).await;
+
+                // Check if vibration control characteristic was written to
+                if let Ok(vibration_value) = vibration_char.get(server) {
+                    if vibration_value != prev_vibration_value && vibration_value != 0 {
+                        // New vibration command received
+                        let pattern = VibrationPattern::from_u8(vibration_value);
+                        info!("[BLE] 📝 Vibration command received: {:?}", pattern);
+                        VIBRATION_SIGNAL.signal(pattern);
+
+                        // Reset to 0 after processing
+                        let _ = vibration_char.set(server, &0);
+                        prev_vibration_value = 0;
+                    } else {
+                        prev_vibration_value = vibration_value;
+                    }
+                }
             }
         }
     }
@@ -374,6 +503,21 @@ async fn main(spawner: Spawner) {
     match spawner.spawn(led_blink_task(board.display)) {
         Ok(_) => info!("✓ LED task spawned"),
         Err(_) => error!("✗ Failed to spawn LED task"),
+    }
+
+    // Initialize vibration motor (P16, active-LOW: HIGH = off, LOW = on)
+    info!("Initializing vibration motor (P16)...");
+    let vibration_pin = embassy_nrf::gpio::Output::new(
+        board.p16,
+        embassy_nrf::gpio::Level::High,  // HIGH = motor OFF (active-low)
+        embassy_nrf::gpio::OutputDrive::Standard,
+    );
+    info!("✓ Vibration motor initialized (OFF - active-low)");
+
+    // Spawn vibration motor task
+    match spawner.spawn(vibration_task(vibration_pin)) {
+        Ok(_) => info!("✓ Vibration task spawned"),
+        Err(_) => error!("✗ Failed to spawn vibration task"),
     }
 
     // Spawn joystick reading task with ADC peripheral and pins

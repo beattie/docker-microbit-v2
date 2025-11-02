@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-GUI Test for micro:bit BLE Joystick + Buttons
+GUI Test for micro:bit BLE Joystick + Buttons + Vibration
 
-A graphical interface to test the joystick and buttons with real-time visual feedback.
+A graphical interface to test the joystick, buttons, and vibration motor
+with real-time visual feedback and BLE control.
 
 Requirements:
     pip install bleak
@@ -24,6 +25,7 @@ X_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef1"
 Y_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef2"
 BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"
 BTN_B_UUID = "12345678-1234-5678-1234-56789abcdef4"
+VIBRATION_UUID = "12345678-1234-5678-1234-56789abcdefa"
 
 DEVICE_NAME = "microbit-joy"
 
@@ -31,15 +33,17 @@ DEVICE_NAME = "microbit-joy"
 class JoystickGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("micro:bit Joystick + Buttons Test")
-        self.root.geometry("600x850")  # Increased height to show buttons
-        self.root.minsize(600, 850)  # Set minimum size
+        self.root.title("micro:bit Joystick + Buttons + Vibration Test")
+        self.root.geometry("720x1200")  # Increased height for vibration controls
+        self.root.minsize(720, 1200)  # Set minimum size
         self.root.configure(bg='#f0f0f0')
 
         # BLE connection state
         self.client = None
         self.connected = False
         self.ble_thread = None
+        self.ble_loop = None  # Store event loop reference
+        self.shutting_down = False  # Flag to stop processing notifications
 
         # Joystick state
         self.joystick_x = 512
@@ -65,7 +69,7 @@ class JoystickGUI:
 
         subtitle_label = tk.Label(
             title_frame,
-            text="Joystick + Button BLE Test",
+            text="Joystick + Buttons + Vibration BLE Test",
             font=("Arial", 12),
             bg='#667eea',
             fg='white'
@@ -189,6 +193,92 @@ class JoystickGUI:
         self.button_b_status = tk.Label(self.button_b_frame, text="Released", font=("Arial", 11), bg='white', fg='#666')
         self.button_b_status.pack()
 
+        # Vibration control frame
+        vibration_frame = tk.LabelFrame(
+            self.root,
+            text="🔊 Vibration Motor Control",
+            font=("Arial", 14, "bold"),
+            bg='#f8f9fa',
+            pady=20,
+            padx=20
+        )
+        vibration_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+
+        vib_label = tk.Label(
+            vibration_frame,
+            text="Click buttons to trigger vibration patterns via BLE\n(Motor vibrates when you press pattern buttons)",
+            font=("Arial", 10),
+            bg='#f8f9fa',
+            fg='#666',
+            justify=tk.CENTER
+        )
+        vib_label.pack(pady=(0, 10))
+
+        # Create grid for vibration buttons
+        vib_grid1 = tk.Frame(vibration_frame, bg='#f8f9fa')
+        vib_grid1.pack(pady=5)
+
+        vib_grid2 = tk.Frame(vibration_frame, bg='#f8f9fa')
+        vib_grid2.pack(pady=5)
+
+        # Define vibration patterns
+        patterns = [
+            ("Off", 0, '#e74c3c'),
+            ("Short\n50ms", 1, '#667eea'),
+            ("Medium\n150ms", 2, '#667eea'),
+            ("Long\n300ms", 3, '#667eea'),
+            ("Double\nPulse", 4, '#5f27cd'),
+            ("Triple\nPulse", 5, '#5f27cd')
+        ]
+
+        # Create buttons for each pattern
+        for i, (label, pattern_id, color) in enumerate(patterns):
+            parent = vib_grid1 if i < 3 else vib_grid2
+
+            # Create button with fixed size
+            btn = tk.Button(
+                parent,
+                text=label,
+                command=lambda p=pattern_id: self.send_vibration(p),
+                font=("Arial", 10, "bold"),
+                bg=color,
+                fg='white',
+                relief=tk.RAISED,
+                borderwidth=3,
+                width=12,
+                height=3,
+                cursor='hand2'
+            )
+            btn.pack(side=tk.LEFT, padx=8, pady=8)
+
+            # Disable vibration buttons until connected
+            if i == 0:
+                self.vib_off_btn = btn
+            elif i == 1:
+                self.vib_short_btn = btn
+            elif i == 2:
+                self.vib_medium_btn = btn
+            elif i == 3:
+                self.vib_long_btn = btn
+            elif i == 4:
+                self.vib_double_btn = btn
+            elif i == 5:
+                self.vib_triple_btn = btn
+
+        # Store all vibration buttons for enable/disable
+        self.vibration_buttons = [
+            self.vib_off_btn,
+            self.vib_short_btn,
+            self.vib_medium_btn,
+            self.vib_long_btn,
+            self.vib_double_btn,
+            self.vib_triple_btn
+        ]
+
+        # Disable all vibration buttons initially
+        for btn in self.vibration_buttons:
+            btn.config(state=tk.DISABLED)
+
     def update_status(self, message, color):
         """Update connection status"""
         self.status_label.config(text=message)
@@ -248,8 +338,37 @@ class JoystickGUI:
             import traceback
             traceback.print_exc()
 
+    def send_vibration(self, pattern):
+        """Send vibration command via BLE"""
+        if not self.connected or not self.client or not self.ble_loop:
+            messagebox.showwarning("Not Connected", "Please connect to micro:bit first!")
+            return
+
+        pattern_names = ["Off", "Short", "Medium", "Long", "Double", "Triple"]
+        print(f"🔊 Sending vibration pattern: {pattern} ({pattern_names[pattern]})")
+
+        # Schedule write in the BLE event loop (thread-safe)
+        async def write_vibration():
+            try:
+                await self.client.write_gatt_char(VIBRATION_UUID, bytes([pattern]))
+                print(f"   ✅ Vibration command sent successfully")
+            except Exception as e:
+                print(f"   ❌ Error sending vibration: {e}")
+                self.root.after(0, lambda err=str(e): messagebox.showerror("BLE Error", f"Failed to send vibration: {err}"))
+
+        # Use run_coroutine_threadsafe to schedule in the BLE loop
+        try:
+            asyncio.run_coroutine_threadsafe(write_vibration(), self.ble_loop)
+        except Exception as e:
+            print(f"   ❌ Error scheduling vibration: {e}")
+            messagebox.showerror("BLE Error", f"Failed to schedule vibration: {e}")
+
     def notification_handler(self, sender, data):
         """Handle BLE notifications"""
+        # Ignore notifications if shutting down
+        if self.shutting_down:
+            return
+
         uuid = sender.uuid.lower()
 
         if uuid == X_CHAR_UUID.lower():
@@ -281,6 +400,12 @@ class JoystickGUI:
     async def connect_ble(self):
         """Connect to BLE device"""
         try:
+            # Reset shutdown flag for new connection
+            self.shutting_down = False
+
+            # Store event loop reference for thread-safe operations
+            self.ble_loop = asyncio.get_event_loop()
+
             self.root.after(0, lambda: self.update_status("Scanning for micro:bit...", "yellow"))
 
             device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10.0)
@@ -301,9 +426,11 @@ class JoystickGUI:
 
             self.root.after(0, lambda: self.update_status("Connecting...", "yellow"))
 
-            async with BleakClient(device) as client:
+            async with BleakClient(device, timeout=20.0) as client:
                 self.client = client
                 self.connected = True
+
+                print(f"🔗 BLE client connected: {client.is_connected}")
 
                 # Read initial values
                 print("📖 Reading initial values...")
@@ -343,21 +470,75 @@ class JoystickGUI:
                 self.root.after(0, lambda: self.update_status("✅ Connected!", "green"))
                 self.root.after(0, lambda: self.connect_btn.config(text="Disconnect"))
 
+                # Enable vibration buttons
+                for btn in self.vibration_buttons:
+                    self.root.after(0, lambda b=btn: b.config(state=tk.NORMAL))
+
                 # Keep connection alive
                 while self.connected:
                     await asyncio.sleep(0.1)
 
-                # Cleanup
-                await client.stop_notify(X_CHAR_UUID)
-                await client.stop_notify(Y_CHAR_UUID)
-                await client.stop_notify(BTN_A_UUID)
-                await client.stop_notify(BTN_B_UUID)
+                # Disconnection requested - clean shutdown
+                print("🔌 Disconnecting - stopping notifications...")
+                try:
+                    await client.stop_notify(X_CHAR_UUID)
+                    await client.stop_notify(Y_CHAR_UUID)
+                    await client.stop_notify(BTN_A_UUID)
+                    await client.stop_notify(BTN_B_UUID)
+                    print("   ✅ Notifications stopped")
+                except Exception as e:
+                    print(f"   ⚠️ Error stopping notifications: {e}")
+
+                # Explicitly disconnect before exiting context
+                print("🔌 Explicitly disconnecting BLE client...")
+                try:
+                    if client.is_connected:
+                        await client.disconnect()
+                        print("   ✅ Client disconnected")
+                    else:
+                        print("   ℹ️ Client already disconnected")
+                except Exception as e:
+                    print(f"   ⚠️ Error disconnecting: {e}")
+
+                # Small delay to ensure disconnect completes
+                await asyncio.sleep(0.3)
 
         except Exception as e:
             self.connected = False
+            self.ble_loop = None  # Clear loop reference
+
+            print(f"❌ BLE Error: {e}")
+
+            # Try to disconnect if we have a client reference
+            if self.client:
+                try:
+                    print("🔌 Attempting emergency disconnect...")
+                    if self.client.is_connected:
+                        await self.client.disconnect()
+                        print("   ✅ Emergency disconnect successful")
+                except Exception as disc_err:
+                    print(f"   ⚠️ Emergency disconnect failed: {disc_err}")
+
             self.root.after(0, lambda: self.update_status(f"Error: {str(e)}", "red"))
             self.root.after(0, lambda: messagebox.showerror("BLE Error", str(e)))
             self.root.after(0, lambda: self.connect_btn.config(text="Connect to micro:bit", state=tk.NORMAL))
+
+            # Disable vibration buttons
+            for btn in self.vibration_buttons:
+                self.root.after(0, lambda b=btn: b.config(state=tk.DISABLED))
+        finally:
+            # Ensure cleanup
+            self.ble_loop = None
+            self.client = None
+            self.connected = False
+            self.shutting_down = False  # Reset for next connection
+            print("🔌 BLE connection fully closed")
+
+            # Update UI
+            self.root.after(0, lambda: self.update_status("Disconnected", "red"))
+            self.root.after(0, lambda: self.connect_btn.config(text="Connect to micro:bit", state=tk.NORMAL))
+            for btn in self.vibration_buttons:
+                self.root.after(0, lambda b=btn: b.config(state=tk.DISABLED))
 
     def toggle_connection(self):
         """Toggle BLE connection"""
@@ -366,15 +547,46 @@ class JoystickGUI:
             self.ble_thread = threading.Thread(target=lambda: asyncio.run(self.connect_ble()), daemon=True)
             self.ble_thread.start()
         else:
+            print("🔌 User requested disconnect...")
+            self.shutting_down = True  # Stop processing notifications
             self.connected = False
+            self.ble_loop = None  # Clear loop reference
             self.update_status("Disconnected", "red")
             self.connect_btn.config(text="Connect to micro:bit", state=tk.NORMAL)
 
+            # Disable vibration buttons
+            for btn in self.vibration_buttons:
+                btn.config(state=tk.DISABLED)
+
     def on_closing(self):
         """Handle window close"""
+        print("\n🛑 Window closing - cleaning up BLE connection...")
+
+        # Stop processing notifications immediately
+        self.shutting_down = True
+        print("   🛑 Stopped processing notifications")
+
+        # Signal disconnect
         self.connected = False
+        self.ble_loop = None
+
+        # Give the async loop a moment to wake up and process the disconnect signal
+        import time
+        time.sleep(0.3)
+
+        # Wait for BLE thread to finish cleanup
         if self.ble_thread and self.ble_thread.is_alive():
-            self.ble_thread.join(timeout=1.0)
+            print("   Waiting for BLE thread to finish (up to 5 seconds)...")
+            self.ble_thread.join(timeout=5.0)  # Increased timeout for proper cleanup
+
+            if self.ble_thread.is_alive():
+                print("   ⚠️ WARNING: BLE thread did not finish in time!")
+                print("   ⚠️ This may cause connection issues on next run")
+                print("   💡 Consider power-cycling the micro:bit if reconnection fails")
+            else:
+                print("   ✅ BLE thread finished cleanly")
+
+        print("   ✅ Cleanup complete - destroying window")
         self.root.destroy()
 
 
