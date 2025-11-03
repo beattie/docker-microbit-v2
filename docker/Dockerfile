@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     libusb-1.0-0-dev \
     cmake \
     unzip \
+	libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust using rustup
