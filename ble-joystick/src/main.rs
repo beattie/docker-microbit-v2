@@ -51,6 +51,58 @@ impl VibrationPattern {
 // Global signal for vibration commands
 static VIBRATION_SIGNAL: Signal<ThreadModeRawMutex, VibrationPattern> = Signal::new();
 
+// impl stands for "implementation" this is how we add methods and functions
+// to the enum BuzzerTone. 
+//
+// Buzzer tone commands (enum, the TYPE)
+#[derive(Clone, Copy, Debug, defmt::Format)]
+enum BuzzerTone {
+    Off,        // 0: No sound
+    C4,         // 1: 262 Hz (Middle C)
+    D4,         // 2: 294 Hz
+    E4,         // 3: 330 Hz
+    G4,         // 4: 392 Hz
+    A4,         // 5: 440 Hz (Concert A)
+    Beep,       // 6: Short 1000Hz beep
+    Success,    // 7: Rising tone pattern (C4-E4-G4)
+    Error,      // 8: Descending tone (G4-E4-C4)
+}
+
+// The implementation - adds methods to BuzzerTone
+impl BuzzerTone {
+    fn from_u8(value: u8) -> Self {
+        match value {
+            0 => BuzzerTone::Off,
+            1 => BuzzerTone::C4,
+            2 => BuzzerTone::D4,
+            3 => BuzzerTone::E4,
+            4 => BuzzerTone::G4,
+            5 => BuzzerTone::A4,
+            6 => BuzzerTone::Beep,
+            7 => BuzzerTone::Success,
+            8 => BuzzerTone::Error,
+            _ => BuzzerTone::Off,
+        }
+    }
+
+    // Method (takes &self) - called like: tone.frequency()
+    fn frequency(&self) -> u32 {
+        match self {
+            BuzzerTone::Off => 0,
+            BuzzerTone::C4 => 262,
+            BuzzerTone::D4 => 294,
+            BuzzerTone::E4 => 330,
+            BuzzerTone::G4 => 392,
+            BuzzerTone::A4 => 440,
+            BuzzerTone::Beep => 1000,
+            BuzzerTone::Success => 262, // Start note for pattern
+            BuzzerTone::Error => 392,   // Start note for pattern
+        }
+    }
+}
+
+static BUZZER_SIGNAL: Signal<ThreadModeRawMutex, BuzzerTone> = Signal::new();
+
 // Max number of connections
 const CONNECTIONS_MAX: usize = 1;
 
@@ -80,6 +132,9 @@ struct JoystickService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdefa", write)]
     vibration_control: u8,  // 0=off, 1=short, 2=medium, 3=long, 4=double, 5=triple
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdefb", write)]
+    buzzer_control: u8,  // 0=off, 1-5=notes, 6=beep, 7=success, 8=error
 }
 
 #[embassy_executor::task]
@@ -171,6 +226,108 @@ async fn vibration_task(mut vibration_pin: embassy_nrf::gpio::Output<'static>) {
 
         // Ensure motor is off after pattern (INVERTED: HIGH = OFF)
         vibration_pin.set_high();
+    }
+}
+
+// Helper function for passive buzzer - blocking pin toggle at frequency
+fn play_tone_blocking(pin: &mut embassy_nrf::gpio::Output<'_>, frequency: u32, duration_ms: u64) {
+    if frequency == 0 {
+        return;
+    }
+
+    // Calculate microseconds per half-cycle
+    let half_period_us = 500_000 / frequency;
+
+    // Calculate total number of cycles needed
+    let total_cycles = (duration_ms * frequency as u64) / 1000;
+
+    // Use embassy_time::Delay for precise blocking delays
+    use embassy_time::Delay;
+    use embedded_hal::delay::DelayNs;
+    let mut delay = Delay;
+
+    for _ in 0..total_cycles {
+        pin.set_high();
+        delay.delay_us(half_period_us);
+        pin.set_low();
+        delay.delay_us(half_period_us);
+    }
+}
+
+
+#[embassy_executor::task]
+async fn buzzer_task(
+    _pwm: embassy_nrf::Peri<'static, embassy_nrf::peripherals::PWM0>,
+    p0: embassy_nrf::Peri<'static, embassy_nrf::peripherals::P0_02>) {
+    use embassy_nrf::gpio::{Level, Output, OutputDrive};
+
+    info!("✓ Buzzer task started (P0)");
+    info!("PASSIVE BUZZER detected - using frequency generation");
+    info!("Tones: C4=262Hz, D4=294Hz, E4=330Hz, G4=392Hz, A4=440Hz");
+
+    // Create simple GPIO output for passive buzzer control
+    let mut buzzer_pin = Output::new(p0, Level::Low, OutputDrive::Standard);
+
+    // Startup beep to confirm buzzer is working
+    info!("  → Startup beep: 440 Hz for 500ms");
+    play_tone_blocking(&mut buzzer_pin, 440, 500);
+    Timer::after(Duration::from_millis(300)).await;
+
+    loop {
+        // Wait for buzzer command
+        let tone = BUZZER_SIGNAL.wait().await;
+
+        info!("🔊 Buzzer tone: {:?}", tone);
+
+        match tone {
+            BuzzerTone::Off => {
+                buzzer_pin.set_low();
+                info!("  → Buzzer OFF");
+            }
+            BuzzerTone::C4 => {
+                info!("  → C4: 262 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 262, 200);
+            }
+            BuzzerTone::D4 => {
+                info!("  → D4: 294 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 294, 200);
+            }
+            BuzzerTone::E4 => {
+                info!("  → E4: 330 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 330, 200);
+            }
+            BuzzerTone::G4 => {
+                info!("  → G4: 392 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 392, 200);
+            }
+            BuzzerTone::A4 => {
+                info!("  → A4: 440 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 440, 200);
+            }
+            BuzzerTone::Beep => {
+                info!("  → Beep: 1000 Hz, 200ms");
+                play_tone_blocking(&mut buzzer_pin, 1000, 200);
+            }
+            BuzzerTone::Success => {
+                info!("  → Success: C4→E4→G4");
+                play_tone_blocking(&mut buzzer_pin, 262, 100);
+                Timer::after(Duration::from_millis(50)).await;
+                play_tone_blocking(&mut buzzer_pin, 330, 100);
+                Timer::after(Duration::from_millis(50)).await;
+                play_tone_blocking(&mut buzzer_pin, 392, 150);
+            }
+            BuzzerTone::Error => {
+                info!("  → Error: G4→E4→C4");
+                play_tone_blocking(&mut buzzer_pin, 392, 100);
+                Timer::after(Duration::from_millis(50)).await;
+                play_tone_blocking(&mut buzzer_pin, 330, 100);
+                Timer::after(Duration::from_millis(50)).await;
+                play_tone_blocking(&mut buzzer_pin, 262, 150);
+            }
+        }
+
+        // Ensure buzzer is off after pattern
+        buzzer_pin.set_low();
     }
 }
 
@@ -268,11 +425,13 @@ async fn joystick_read_task(
         // Haptic feedback on button press (rising edge detection)
         if btn_a_pressed && !btn_a_prev {
             VIBRATION_SIGNAL.signal(VibrationPattern::Short);
-            info!("  🔊 Haptic feedback: Button A pressed");
+            BUZZER_SIGNAL.signal(BuzzerTone::C4);  // Low beep for button A
+            info!("  🔊 Feedback: Button A pressed (vibration + beep)");
         }
         if btn_b_pressed && !btn_b_prev {
             VIBRATION_SIGNAL.signal(VibrationPattern::Short);
-            info!("  🔊 Haptic feedback: Button B pressed");
+            BUZZER_SIGNAL.signal(BuzzerTone::E4);  // Higher beep for button B
+            info!("  🔊 Feedback: Button B pressed (vibration + beep)");
         }
 
         // Update previous button states
@@ -394,6 +553,7 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
     let btn_a_char = server.joystick_service.button_a;
     let btn_b_char = server.joystick_service.button_b;
     let vibration_char = server.joystick_service.vibration_control;
+    let buzzer_char = server.joystick_service.buzzer_control;
 
     // Set initial values
     let _ = x_char.set(server, &512);
@@ -401,10 +561,12 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
     let _ = btn_a_char.set(server, &0);
     let _ = btn_b_char.set(server, &0);
     let _ = vibration_char.set(server, &0);
+    let _ = buzzer_char.set(server, &0);
 
     info!("[BLE] Starting notification loop (joystick + buttons + vibration)...");
 
     let mut prev_vibration_value = 0u8;
+    let mut prev_buzzer_value = 0u8;
 
     loop {
         // Use select to handle both GATT events and joystick updates
@@ -452,6 +614,22 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
                         prev_vibration_value = 0;
                     } else {
                         prev_vibration_value = vibration_value;
+                    }
+                }
+
+                // Check if buzzer control characteristic was written to
+                if let Ok(buzzer_value) = buzzer_char.get(server) {
+                    if buzzer_value != prev_buzzer_value && buzzer_value != 0 {
+                        // New buzzer command received
+                        let tone = BuzzerTone::from_u8(buzzer_value);
+                        info!("[BLE] 📝 Buzzer command received: {:?}", tone);
+                        BUZZER_SIGNAL.signal(tone);
+
+                        // Reset to 0 after processing
+                        let _ = buzzer_char.set(server, &0);
+                        prev_buzzer_value = 0;
+                    } else {
+                        prev_buzzer_value = buzzer_value;
                     }
                 }
             }
@@ -518,6 +696,13 @@ async fn main(spawner: Spawner) {
     match spawner.spawn(vibration_task(vibration_pin)) {
         Ok(_) => info!("✓ Vibration task spawned"),
         Err(_) => error!("✗ Failed to spawn vibration task"),
+    }
+
+    // Spawn buzzer task (P0 PWM)
+    info!("Spawning buzzer task...");
+    match spawner.spawn(buzzer_task(board.pwm0, board.p0)) {
+        Ok(_) => info!("✓ Buzzer task spawned"),
+        Err(_) => error!("✗ Failed to spawn buzzer task"),
     }
 
     // Spawn joystick reading task with ADC peripheral and pins
