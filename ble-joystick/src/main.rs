@@ -16,8 +16,12 @@ use {defmt_rtt as _, panic_probe as _};
 struct JoystickData {
     x: u16,       // 0-1023 range, center at 512
     y: u16,       // 0-1023 range, center at 512
-    button_a: u8, // 0 = released, 1 = pressed
+//    button_a: u8, // 0 = released, 1 = pressed
     button_b: u8, // 0 = released, 1 = pressed
+    button_1: u8,   // 0 = released, 1 = pressed
+    button_2: u8,   // 0 = released, 1 = pressed
+    button_3: u8,   // 0 = released, 1 = pressed
+    button_4: u8,   // 0 = released, 1 = pressed
 }
 
 // Global signal for joystick data (always latest value)
@@ -124,11 +128,23 @@ struct JoystickService {
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
     y_axis: u16,
 
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
-    button_a: u8,  // 0 = released, 1 = pressed
+//    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
+//    button_a: u8,  // 0 = released, 1 = pressed
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
     button_b: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef5", read, notify)]
+    button_1: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef6", read, notify)]
+    button_2: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef7", read, notify)]
+    button_3: u8,  // 0 = released, 1 = pressed
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef8", read, notify)]
+    button_4: u8,  // 0 = released, 1 = pressed
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdefa", write)]
     vibration_control: u8,  // 0=off, 1=short, 2=medium, 3=long, 4=double, 5=triple
@@ -336,8 +352,12 @@ async fn joystick_read_task(
     saadc: embassy_nrf::Peri<'static, embassy_nrf::peripherals::SAADC>,
     p1: embassy_nrf::Peri<'static, embassy_nrf::peripherals::P0_03>,
     p2: embassy_nrf::Peri<'static, embassy_nrf::peripherals::P0_04>,
-    button_a: embassy_nrf::gpio::Input<'static>,
+//    button_a: embassy_nrf::gpio::Input<'static>,
     button_b: embassy_nrf::gpio::Input<'static>,
+    button_1: embassy_nrf::gpio::Input<'static>,
+    button_2: embassy_nrf::gpio::Input<'static>,
+    button_3: embassy_nrf::gpio::Input<'static>,
+    button_4: embassy_nrf::gpio::Input<'static>,
 ) {
     info!("✓ Joystick ADC task started");
     info!("Joystick pins: P1 (X-axis), P2 (Y-axis)");
@@ -393,8 +413,12 @@ async fn joystick_read_task(
     let mut count = 0u32;
 
     // Track previous button states for edge detection (haptic feedback)
-    let mut btn_a_prev = false;
+//    let mut btn_a_prev = false;
     let mut btn_b_prev = false;
+    let mut btn_1_prev = false;
+    let mut btn_2_prev = false;
+    let mut btn_3_prev = false;
+    let mut btn_4_prev = false;
 
     loop {
         // Read both ADC channels
@@ -419,38 +443,71 @@ async fn joystick_read_task(
         count += 1;
 
         // Read button states (active-low: pressed = low = false)
-        let btn_a_pressed = !button_a.is_high();
+//        let btn_a_pressed = !button_a.is_high();
         let btn_b_pressed = !button_b.is_high();
+        let btn_1_pressed = !button_1.is_high();
+        let btn_2_pressed = !button_2.is_high();
+        let btn_3_pressed = !button_3.is_high();
+        let btn_4_pressed = !button_4.is_high();
 
         // Haptic feedback on button press (rising edge detection)
-        if btn_a_pressed && !btn_a_prev {
-            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
-            BUZZER_SIGNAL.signal(BuzzerTone::C4);  // Low beep for button A
-            info!("  🔊 Feedback: Button A pressed (vibration + beep)");
-        }
+//        if btn_a_pressed && !btn_a_prev {
+//            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+//            BUZZER_SIGNAL.signal(BuzzerTone::C4);  // Low beep for button A
+//            info!("  🔊 Feedback: Button A pressed (vibration + beep)");
+//        }
         if btn_b_pressed && !btn_b_prev {
-            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
-            BUZZER_SIGNAL.signal(BuzzerTone::E4);  // Higher beep for button B
+            VIBRATION_SIGNAL.signal(VibrationPattern::Double);
+            BUZZER_SIGNAL.signal(BuzzerTone::Error);  // Warning tone
             info!("  🔊 Feedback: Button B pressed (vibration + beep)");
+        }
+        if btn_1_pressed && !btn_1_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            BUZZER_SIGNAL.signal(BuzzerTone::C4);  // Low C
+            info!("  🔊 Feedback: Button 1 pressed (vibration + beep)");
+        }
+        if btn_2_pressed && !btn_2_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            BUZZER_SIGNAL.signal(BuzzerTone::D4);  // D
+            info!("  🔊 Feedback: Button 2 pressed (vibration + beep)");
+        }
+        if btn_3_pressed && !btn_3_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            BUZZER_SIGNAL.signal(BuzzerTone::E4);  // E
+            info!("  🔊 Feedback: Button 3 pressed (vibration + beep)");
+        }
+        if btn_4_pressed && !btn_4_prev {
+            VIBRATION_SIGNAL.signal(VibrationPattern::Short);
+            BUZZER_SIGNAL.signal(BuzzerTone::A4);  // High A
+            info!("  🔊 Feedback: Button 4 pressed (vibration + beep)");
         }
 
         // Update previous button states
-        btn_a_prev = btn_a_pressed;
+//        btn_a_prev = btn_a_pressed;
         btn_b_prev = btn_b_pressed;
+        btn_1_prev = btn_1_pressed;
+        btn_2_prev = btn_2_pressed;
+        btn_3_prev = btn_3_pressed;
+        btn_4_prev = btn_4_pressed;
 
         // Send joystick data to BLE task via signal
         let joystick_data = JoystickData {
             x: x_value,
             y: y_value,
-            button_a: btn_a_pressed as u8,
+//            button_a: btn_a_pressed as u8,
             button_b: btn_b_pressed as u8,
+            button_1: btn_1_pressed as u8,
+            button_2: btn_2_pressed as u8,
+            button_3: btn_3_pressed as u8,
+            button_4: btn_4_pressed as u8,
         };
         JOYSTICK_SIGNAL.signal(joystick_data);
 
         // Log every 10th reading to reduce console output
         if count % 10 == 0 {
             info!(
-                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={}), Btn A={}, Btn B={}",
+//                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={}), Btn A={}, Btn B={}",
+                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={}), Btn B={}, Btn 1={}, Btn 2={}, Btn 3={}, Btn 4={}",
                 count / 5,
                 x_value,
                 x_raw,
@@ -460,8 +517,12 @@ async fn joystick_read_task(
                 y_raw,
                 y_delta,
                 y_centered,
-                if btn_a_pressed { "PRESSED" } else { "released" },
-                if btn_b_pressed { "PRESSED" } else { "released" }
+//                if btn_a_pressed { "PRESSED" } else { "released" },
+                if btn_b_pressed { "PRESSED" } else { "released" },
+                if btn_1_pressed { "PRESSED" } else { "released" },
+                if btn_2_pressed { "PRESSED" } else { "released" },
+                if btn_3_pressed { "PRESSED" } else { "released" },
+                if btn_4_pressed { "PRESSED" } else { "released" }
             );
 
             // Detect significant movements (threshold = 150 from center, with deadzone of 50)
@@ -489,11 +550,23 @@ async fn joystick_read_task(
             }
 
             // Log button press/release events
-            if btn_a_pressed {
-                info!("  🔘 Button A: PRESSED");
-            }
+//            if btn_a_pressed {
+//                info!("  🔘 Button A: PRESSED");
+//            }
             if btn_b_pressed {
                 info!("  🔘 Button B: PRESSED");
+            }
+            if btn_1_pressed {
+                info!("  🔘 Button 1: PRESSED");
+            }
+            if btn_2_pressed {
+                info!("  🔘 Button 2: PRESSED");
+            }
+            if btn_3_pressed {
+                info!("  🔘 Button 3: PRESSED");
+            }
+            if btn_4_pressed {
+                info!("  🔘 Button 4: PRESSED");
             }
         }
 
@@ -550,20 +623,28 @@ async fn advertise<'a, 'b, C: Controller>(
 async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &GattConnection<'_, '_, P>) {
     let x_char = server.joystick_service.x_axis;
     let y_char = server.joystick_service.y_axis;
-    let btn_a_char = server.joystick_service.button_a;
+//    let btn_a_char = server.joystick_service.button_a;
     let btn_b_char = server.joystick_service.button_b;
+    let btn_1_char = server.joystick_service.button_1;
+    let btn_2_char = server.joystick_service.button_2;
+    let btn_3_char = server.joystick_service.button_3;
+    let btn_4_char = server.joystick_service.button_4;
     let vibration_char = server.joystick_service.vibration_control;
     let buzzer_char = server.joystick_service.buzzer_control;
 
     // Set initial values
     let _ = x_char.set(server, &512);
     let _ = y_char.set(server, &512);
-    let _ = btn_a_char.set(server, &0);
+//    let _ = btn_a_char.set(server, &0);
     let _ = btn_b_char.set(server, &0);
+    let _ = btn_1_char.set(server, &0);
+    let _ = btn_2_char.set(server, &0);
+    let _ = btn_3_char.set(server, &0);
+    let _ = btn_4_char.set(server, &0);
     let _ = vibration_char.set(server, &0);
     let _ = buzzer_char.set(server, &0);
 
-    info!("[BLE] Starting notification loop (joystick + buttons + vibration)...");
+    info!("[BLE] Starting notification loop (joystick + 5 buttons + vibration)...");
 
     let mut prev_vibration_value = 0u8;
     let mut prev_buzzer_value = 0u8;
@@ -593,13 +674,21 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
                 // Update characteristic values and notify
                 let _ = x_char.set(server, &data.x);
                 let _ = y_char.set(server, &data.y);
-                let _ = btn_a_char.set(server, &data.button_a);
+//                let _ = btn_a_char.set(server, &data.button_a);
                 let _ = btn_b_char.set(server, &data.button_b);
+                let _ = btn_1_char.set(server, &data.button_1);
+                let _ = btn_2_char.set(server, &data.button_2);
+                let _ = btn_3_char.set(server, &data.button_3);
+                let _ = btn_4_char.set(server, &data.button_4);
 
                 let _ = x_char.notify(conn, &data.x).await;
                 let _ = y_char.notify(conn, &data.y).await;
-                let _ = btn_a_char.notify(conn, &data.button_a).await;
+//                let _ = btn_a_char.notify(conn, &data.button_a).await;
                 let _ = btn_b_char.notify(conn, &data.button_b).await;
+                let _ = btn_1_char.notify(conn, &data.button_1).await;
+                let _ = btn_2_char.notify(conn, &data.button_2).await;
+                let _ = btn_3_char.notify(conn, &data.button_3).await;
+                let _ = btn_4_char.notify(conn, &data.button_4).await;
 
                 // Check if vibration control characteristic was written to
                 if let Ok(vibration_value) = vibration_char.get(server) {
@@ -705,9 +794,39 @@ async fn main(spawner: Spawner) {
         Err(_) => error!("✗ Failed to spawn buzzer task"),
     }
 
+    // Initialize Joystick:bit buttons (1, 2, 3, 4)
+    info!("Initializing joystick:bit buttons (1. 2. 3. 4)...");
+    let button_1 = embassy_nrf::gpio::Input::new(
+        board.p12,
+        embassy_nrf::gpio::Pull::Up,
+    );
+    let button_2 = embassy_nrf::gpio::Input::new(
+        board.p13,
+        embassy_nrf::gpio::Pull::Up,
+    );
+    let button_3 = embassy_nrf::gpio::Input::new(
+        board.p14,  // overloads Button A
+        embassy_nrf::gpio::Pull::Up,
+    );
+    let button_4 = embassy_nrf::gpio::Input::new(
+        board.p15,
+        embassy_nrf::gpio::Pull::Up,
+    );
+    info!("✓ Joystick:bit buttons 1, 2, 3, 4 initialized (active-low with pull-up)");
+
     // Spawn joystick reading task with ADC peripheral and pins
     info!("Spawning joystick task...");
-    match spawner.spawn(joystick_read_task(board.saadc, board.p1, board.p2, board.btn_a, board.btn_b)) {
+    match spawner.spawn(joystick_read_task(
+            board.saadc,
+            board.p1,
+            board.p2,
+//            board.btn_a,
+            board.btn_b,
+            button_1,
+            button_2,
+            button_3,
+            button_4,
+    )) {
         Ok(_) => info!("✓ Joystick task spawned"),
         Err(_) => error!("✗ Failed to spawn joystick task"),
     }

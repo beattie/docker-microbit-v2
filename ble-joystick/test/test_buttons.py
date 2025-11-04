@@ -1,12 +1,9 @@
 #!/usr/bin/env python3
 """
-Test script for micro:bit BLE Joystick + Buttons
+Button Test - Diagnostic script to verify button notifications
 
-Connects to the micro:bit and monitors all 4 characteristics:
-- X-axis (joystick)
-- Y-axis (joystick)
-- Button A
-- Button B
+Tests all 5 buttons (B, 1, 2, 3, 4) by monitoring BLE notifications.
+Use this to verify buttons are working before using the GUI.
 
 Requirements:
     pip install bleak
@@ -17,163 +14,142 @@ Usage:
 
 import asyncio
 from bleak import BleakScanner, BleakClient
-import sys
 
-# BLE UUIDs for the joystick service
+# BLE UUIDs
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
-X_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef1"
-Y_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef2"
-BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"
 BTN_B_UUID = "12345678-1234-5678-1234-56789abcdef4"
+BTN_1_UUID = "12345678-1234-5678-1234-56789abcdef5"
+BTN_2_UUID = "12345678-1234-5678-1234-56789abcdef6"
+BTN_3_UUID = "12345678-1234-5678-1234-56789abcdef7"
+BTN_4_UUID = "12345678-1234-5678-1234-56789abcdef8"
 
-# Device name to search for
 DEVICE_NAME = "microbit-joy"
 
-# Global state for display
-joystick_x = 512
-joystick_y = 512
-button_a_state = "released"
-button_b_state = "released"
-
+button_states = {
+    'B': False,
+    '1': False,
+    '2': False,
+    '3': False,
+    '4': False,
+}
 
 def notification_handler(sender, data):
-    """Handle notifications from all characteristics"""
-    global joystick_x, joystick_y, button_a_state, button_b_state
-
+    """Handle button notifications"""
     uuid = sender.uuid.lower()
+    pressed = data[0] == 1
 
-    if uuid == X_CHAR_UUID.lower():
-        # X-axis is u16 (little-endian)
-        joystick_x = int.from_bytes(data, byteorder='little', signed=False)
-        print(f"📍 Joystick X: {joystick_x:4d}", end="")
-        print(f"  Y: {joystick_y:4d}  |  Button A: {button_a_state:8s}  Button B: {button_b_state:8s}")
+    button_name = None
+    if uuid == BTN_B_UUID.lower():
+        button_name = 'B'
+    elif uuid == BTN_1_UUID.lower():
+        button_name = '1'
+    elif uuid == BTN_2_UUID.lower():
+        button_name = '2'
+    elif uuid == BTN_3_UUID.lower():
+        button_name = '3'
+    elif uuid == BTN_4_UUID.lower():
+        button_name = '4'
 
-    elif uuid == Y_CHAR_UUID.lower():
-        # Y-axis is u16 (little-endian)
-        joystick_y = int.from_bytes(data, byteorder='little', signed=False)
+    if button_name:
+        button_states[button_name] = pressed
+        status = "PRESSED" if pressed else "released"
+        print(f"🔘 Button {button_name}: {status} (data={data[0]})")
+        print_button_grid()
 
-    elif uuid == BTN_A_UUID.lower():
-        # Button A is u8 (0 = released, 1 = pressed)
-        pressed = data[0] == 1
-        button_a_state = "PRESSED" if pressed else "released"
-        if pressed:
-            print(f"🔘 Button A: PRESSED")
-        else:
-            print(f"   Button A: released")
+def print_button_grid():
+    """Print visual button grid"""
+    b = "🟢" if button_states['B'] else "⚪"
+    btn1 = "🟢" if button_states['1'] else "⚪"
+    btn2 = "🟢" if button_states['2'] else "⚪"
+    btn3 = "🟢" if button_states['3'] else "⚪"
+    btn4 = "🟢" if button_states['4'] else "⚪"
 
-    elif uuid == BTN_B_UUID.lower():
-        # Button B is u8 (0 = released, 1 = pressed)
-        pressed = data[0] == 1
-        button_b_state = "PRESSED" if pressed else "released"
-        if pressed:
-            print(f"🔘 Button B: PRESSED")
-        else:
-            print(f"   Button B: released")
+    print("\n┌─────────────────────────────────┐")
+    print(f"│ {b}  B (micro:bit)               │")
+    print(f"│ {btn1}  1 (P12)  {btn2}  2 (P13)      │")
+    print(f"│ {btn3}  3 (P14)  {btn4}  4 (P15)      │")
+    print("└─────────────────────────────────┘\n")
 
+async def test_buttons():
+    """Test all buttons"""
+    print("=" * 50)
+    print("Button Test - Monitoring all 5 buttons")
+    print("=" * 50)
+    print("\nSearching for micro:bit...")
 
-async def read_initial_values(client):
-    """Read initial values from all characteristics"""
-    print("\n📖 Reading initial values...")
-
-    # Read X-axis
-    x_data = await client.read_gatt_char(X_CHAR_UUID)
-    x_value = int.from_bytes(x_data, byteorder='little', signed=False)
-    print(f"   X-axis: {x_value}")
-
-    # Read Y-axis
-    y_data = await client.read_gatt_char(Y_CHAR_UUID)
-    y_value = int.from_bytes(y_data, byteorder='little', signed=False)
-    print(f"   Y-axis: {y_value}")
-
-    # Read Button A
-    btn_a_data = await client.read_gatt_char(BTN_A_UUID)
-    btn_a = "PRESSED" if btn_a_data[0] == 1 else "released"
-    print(f"   Button A: {btn_a}")
-
-    # Read Button B
-    btn_b_data = await client.read_gatt_char(BTN_B_UUID)
-    btn_b = "PRESSED" if btn_b_data[0] == 1 else "released"
-    print(f"   Button B: {btn_b}")
-
-
-async def main():
-    print("=" * 60)
-    print("micro:bit BLE Joystick + Buttons Test")
-    print("=" * 60)
-    print(f"\n🔍 Scanning for '{DEVICE_NAME}'...")
-
-    # Scan for device
-    try:
-        device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10.0)
-    except Exception as e:
-        print(f"❌ Scan error: {e}")
-        return
+    device = await BleakScanner.find_device_by_name(DEVICE_NAME, timeout=10.0)
 
     if device is None:
-        print(f"❌ Device '{DEVICE_NAME}' not found!")
+        print(f"❌ Could not find '{DEVICE_NAME}'")
         print("\nTroubleshooting:")
-        print("  1. Make sure micro:bit is powered on")
-        print("  2. Check that firmware is flashed (cargo flash --release)")
-        print("  3. Verify Bluetooth is enabled on this computer")
-        print("  4. Try running: sudo systemctl restart bluetooth")
+        print("1. Is the micro:bit powered on?")
+        print("2. Is the firmware flashed?")
+        print("3. Is Bluetooth enabled?")
         return
 
     print(f"✅ Found device: {device.name} ({device.address})")
-    print(f"\n🔗 Connecting...")
+    print("\nConnecting...")
 
-    # Connect to device
-    try:
-        async with BleakClient(device) as client:
-            print(f"✅ Connected!")
+    async with BleakClient(device, timeout=20.0) as client:
+        print(f"✅ Connected!")
 
-            # Check if service exists
-            services = await client.get_services()
-            service = services.get_service(SERVICE_UUID)
-            if service is None:
-                print(f"❌ Service {SERVICE_UUID} not found!")
-                return
+        # Read initial button states
+        print("\n📖 Reading initial button states...")
+        b_data = await client.read_gatt_char(BTN_B_UUID)
+        btn_1_data = await client.read_gatt_char(BTN_1_UUID)
+        btn_2_data = await client.read_gatt_char(BTN_2_UUID)
+        btn_3_data = await client.read_gatt_char(BTN_3_UUID)
+        btn_4_data = await client.read_gatt_char(BTN_4_UUID)
 
-            print(f"✅ Found joystick service")
+        button_states['B'] = b_data[0] == 1
+        button_states['1'] = btn_1_data[0] == 1
+        button_states['2'] = btn_2_data[0] == 1
+        button_states['3'] = btn_3_data[0] == 1
+        button_states['4'] = btn_4_data[0] == 1
 
-            # Read initial values
-            await read_initial_values(client)
+        print(f"   Button B: {'PRESSED' if button_states['B'] else 'released'}")
+        print(f"   Button 1: {'PRESSED' if button_states['1'] else 'released'}")
+        print(f"   Button 2: {'PRESSED' if button_states['2'] else 'released'}")
+        print(f"   Button 3: {'PRESSED' if button_states['3'] else 'released'}")
+        print(f"   Button 4: {'PRESSED' if button_states['4'] else 'released'}")
 
-            # Subscribe to notifications
-            print(f"\n📡 Starting notifications...")
-            await client.start_notify(X_CHAR_UUID, notification_handler)
-            await client.start_notify(Y_CHAR_UUID, notification_handler)
-            await client.start_notify(BTN_A_UUID, notification_handler)
-            await client.start_notify(BTN_B_UUID, notification_handler)
+        # Subscribe to notifications
+        print("\n📡 Starting button notifications...")
+        await client.start_notify(BTN_B_UUID, notification_handler)
+        print("   ✅ Button B notifications enabled")
+        await client.start_notify(BTN_1_UUID, notification_handler)
+        print("   ✅ Button 1 notifications enabled")
+        await client.start_notify(BTN_2_UUID, notification_handler)
+        print("   ✅ Button 2 notifications enabled")
+        await client.start_notify(BTN_3_UUID, notification_handler)
+        print("   ✅ Button 3 notifications enabled")
+        await client.start_notify(BTN_4_UUID, notification_handler)
+        print("   ✅ Button 4 notifications enabled")
 
-            print("✅ Monitoring joystick and buttons...")
-            print("\nMove the joystick and press buttons A/B on the micro:bit")
-            print("Press Ctrl+C to stop\n")
-            print("-" * 60)
+        print("\n" + "=" * 50)
+        print("🎮 Press buttons on the micro:bit/Joystick:bit")
+        print("   Press Ctrl+C to exit")
+        print("=" * 50)
 
-            # Keep connection alive and monitor for 60 seconds (or until Ctrl+C)
-            try:
-                await asyncio.sleep(3600)  # Monitor for 1 hour
-            except KeyboardInterrupt:
-                print("\n\n⏹️  Stopping...")
+        print_button_grid()
 
-            # Unsubscribe
-            print("📡 Stopping notifications...")
-            await client.stop_notify(X_CHAR_UUID)
-            await client.stop_notify(Y_CHAR_UUID)
-            await client.stop_notify(BTN_A_UUID)
+        # Keep connection alive
+        try:
+            while True:
+                await asyncio.sleep(0.1)
+        except KeyboardInterrupt:
+            print("\n\n🛑 Stopping...")
             await client.stop_notify(BTN_B_UUID)
-
+            await client.stop_notify(BTN_1_UUID)
+            await client.stop_notify(BTN_2_UUID)
+            await client.stop_notify(BTN_3_UUID)
+            await client.stop_notify(BTN_4_UUID)
             print("✅ Disconnected")
-
-    except Exception as e:
-        print(f"❌ Connection error: {e}")
-        import traceback
-        traceback.print_exc()
-
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
-    except KeyboardInterrupt:
-        print("\n\n👋 Goodbye!")
-        sys.exit(0)
+        asyncio.run(test_buttons())
+    except Exception as e:
+        print(f"\n❌ Error: {e}")
+        import traceback
+        traceback.print_exc()

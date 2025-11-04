@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-GUI Test for micro:bit BLE Joystick + Buttons + Vibration
+GUI Test for micro:bit BLE Joystick + 5 Buttons + Vibration + Buzzer
 
-A graphical interface to test the joystick, buttons, and vibration motor
-with real-time visual feedback and BLE control.
+A graphical interface to test the joystick (X/Y axes), 5 buttons
+(B + 1,2,3,4), vibration motor, and buzzer with real-time visual
+feedback and BLE control.
+
+Button Configuration:
+- Button B: micro:bit built-in (P23) - Emergency/Special
+- Buttons 1-4: Joystick:bit (P12, P13, P14, P15)
+- Note: Button 3 uses P14 (replaces micro:bit Button A)
 
 Requirements:
     pip install bleak
@@ -23,9 +29,14 @@ import sys
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 X_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef1"
 Y_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef2"
-BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"
+# BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"  # Unused (replaced by Button 3)
 BTN_B_UUID = "12345678-1234-5678-1234-56789abcdef4"
+BTN_1_UUID = "12345678-1234-5678-1234-56789abcdef5"
+BTN_2_UUID = "12345678-1234-5678-1234-56789abcdef6"
+BTN_3_UUID = "12345678-1234-5678-1234-56789abcdef7"
+BTN_4_UUID = "12345678-1234-5678-1234-56789abcdef8"
 VIBRATION_UUID = "12345678-1234-5678-1234-56789abcdefa"
+BUZZER_UUID = "12345678-1234-5678-1234-56789abcdefb"
 
 DEVICE_NAME = "microbit-joy"
 
@@ -33,8 +44,8 @@ DEVICE_NAME = "microbit-joy"
 class JoystickGUI:
     def __init__(self, root):
         self.root = root
-        self.root.title("micro:bit Joystick + Buttons + Vibration Test")
-        self.root.geometry("720x1200")  # Increased height for vibration controls
+        self.root.title("micro:bit Joystick + 5 Buttons + Vibration + Buzzer Test")
+        self.root.geometry("720x1200")  # Increased height for all controls
         self.root.minsize(720, 1200)  # Set minimum size
         self.root.configure(bg='#f0f0f0')
 
@@ -48,8 +59,11 @@ class JoystickGUI:
         # Joystick state
         self.joystick_x = 512
         self.joystick_y = 512
-        self.button_a_pressed = False
         self.button_b_pressed = False
+        self.button_1_pressed = False
+        self.button_2_pressed = False
+        self.button_3_pressed = False
+        self.button_4_pressed = False
 
         self.setup_ui()
 
@@ -69,7 +83,7 @@ class JoystickGUI:
 
         subtitle_label = tk.Label(
             title_frame,
-            text="Joystick + Buttons + Vibration BLE Test",
+            text="Joystick + 5 Buttons + Vibration + Buzzer BLE Test",
             font=("Arial", 12),
             bg='#667eea',
             fg='white'
@@ -162,7 +176,7 @@ class JoystickGUI:
         # Buttons frame
         buttons_frame = tk.LabelFrame(
             self.root,
-            text="🔘 Buttons",
+            text="🔘 Buttons (B=micro:bit, 1-4=Joystick:bit)",
             font=("Arial", 14, "bold"),
             bg='#f8f9fa',
             pady=20,
@@ -170,28 +184,72 @@ class JoystickGUI:
         )
         buttons_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
 
-        button_grid = tk.Frame(buttons_frame, bg='#f8f9fa')
-        button_grid.pack()
+        # Two rows of buttons
+        button_grid_top = tk.Frame(buttons_frame, bg='#f8f9fa')
+        button_grid_top.pack(pady=5)
 
-        # Button A display
-        self.button_a_frame = tk.Frame(button_grid, bg='white', relief=tk.RAISED, borderwidth=3, width=120, height=80)
-        self.button_a_frame.pack(side=tk.LEFT, padx=20)
-        self.button_a_frame.pack_propagate(False)
+        button_grid_bottom = tk.Frame(buttons_frame, bg='#f8f9fa')
+        button_grid_bottom.pack(pady=5)
 
-        self.button_a_label = tk.Label(self.button_a_frame, text="Button A", font=("Arial", 16, "bold"), bg='white')
-        self.button_a_label.pack(pady=(10, 5))
-        self.button_a_status = tk.Label(self.button_a_frame, text="Released", font=("Arial", 11), bg='white', fg='#666')
-        self.button_a_status.pack()
-
-        # Button B display
-        self.button_b_frame = tk.Frame(button_grid, bg='white', relief=tk.RAISED, borderwidth=3, width=120, height=80)
-        self.button_b_frame.pack(side=tk.LEFT, padx=20)
+        # Button B display (micro:bit) - Special/Emergency button
+        self.button_b_frame = tk.Frame(button_grid_top, bg='white', relief=tk.RAISED, borderwidth=3, width=130, height=80)
+        self.button_b_frame.pack(side=tk.LEFT, padx=10)
         self.button_b_frame.pack_propagate(False)
 
-        self.button_b_label = tk.Label(self.button_b_frame, text="Button B", font=("Arial", 16, "bold"), bg='white')
-        self.button_b_label.pack(pady=(10, 5))
-        self.button_b_status = tk.Label(self.button_b_frame, text="Released", font=("Arial", 11), bg='white', fg='#666')
+        self.button_b_label = tk.Label(self.button_b_frame, text="Button B", font=("Arial", 14, "bold"), bg='white')
+        self.button_b_label.pack(pady=(8, 2))
+        self.button_b_pin = tk.Label(self.button_b_frame, text="(micro:bit)", font=("Arial", 8), bg='white', fg='#999')
+        self.button_b_pin.pack()
+        self.button_b_status = tk.Label(self.button_b_frame, text="Released", font=("Arial", 10), bg='white', fg='#666')
         self.button_b_status.pack()
+
+        # Button 1 display (Joystick:bit P12)
+        self.button_1_frame = tk.Frame(button_grid_top, bg='white', relief=tk.RAISED, borderwidth=3, width=130, height=80)
+        self.button_1_frame.pack(side=tk.LEFT, padx=10)
+        self.button_1_frame.pack_propagate(False)
+
+        self.button_1_label = tk.Label(self.button_1_frame, text="Button 1", font=("Arial", 14, "bold"), bg='white')
+        self.button_1_label.pack(pady=(8, 2))
+        self.button_1_pin = tk.Label(self.button_1_frame, text="(P12)", font=("Arial", 8), bg='white', fg='#999')
+        self.button_1_pin.pack()
+        self.button_1_status = tk.Label(self.button_1_frame, text="Released", font=("Arial", 10), bg='white', fg='#666')
+        self.button_1_status.pack()
+
+        # Button 2 display (Joystick:bit P13)
+        self.button_2_frame = tk.Frame(button_grid_top, bg='white', relief=tk.RAISED, borderwidth=3, width=130, height=80)
+        self.button_2_frame.pack(side=tk.LEFT, padx=10)
+        self.button_2_frame.pack_propagate(False)
+
+        self.button_2_label = tk.Label(self.button_2_frame, text="Button 2", font=("Arial", 14, "bold"), bg='white')
+        self.button_2_label.pack(pady=(8, 2))
+        self.button_2_pin = tk.Label(self.button_2_frame, text="(P13)", font=("Arial", 8), bg='white', fg='#999')
+        self.button_2_pin.pack()
+        self.button_2_status = tk.Label(self.button_2_frame, text="Released", font=("Arial", 10), bg='white', fg='#666')
+        self.button_2_status.pack()
+
+        # Button 3 display (Joystick:bit P14 - replaces Button A)
+        self.button_3_frame = tk.Frame(button_grid_bottom, bg='white', relief=tk.RAISED, borderwidth=3, width=130, height=80)
+        self.button_3_frame.pack(side=tk.LEFT, padx=10)
+        self.button_3_frame.pack_propagate(False)
+
+        self.button_3_label = tk.Label(self.button_3_frame, text="Button 3", font=("Arial", 14, "bold"), bg='white')
+        self.button_3_label.pack(pady=(8, 2))
+        self.button_3_pin = tk.Label(self.button_3_frame, text="(P14/E)", font=("Arial", 8), bg='white', fg='#999')
+        self.button_3_pin.pack()
+        self.button_3_status = tk.Label(self.button_3_frame, text="Released", font=("Arial", 10), bg='white', fg='#666')
+        self.button_3_status.pack()
+
+        # Button 4 display (Joystick:bit P15)
+        self.button_4_frame = tk.Frame(button_grid_bottom, bg='white', relief=tk.RAISED, borderwidth=3, width=130, height=80)
+        self.button_4_frame.pack(side=tk.LEFT, padx=10)
+        self.button_4_frame.pack_propagate(False)
+
+        self.button_4_label = tk.Label(self.button_4_frame, text="Button 4", font=("Arial", 14, "bold"), bg='white')
+        self.button_4_label.pack(pady=(8, 2))
+        self.button_4_pin = tk.Label(self.button_4_frame, text="(P15)", font=("Arial", 8), bg='white', fg='#999')
+        self.button_4_pin.pack()
+        self.button_4_status = tk.Label(self.button_4_frame, text="Released", font=("Arial", 10), bg='white', fg='#666')
+        self.button_4_status.pack()
 
         # Vibration control frame
         vibration_frame = tk.LabelFrame(
@@ -302,32 +360,54 @@ class JoystickGUI:
 
     def update_button_display(self, button, pressed):
         """Update button display"""
-        print(f"🎨 Updating GUI: Button {button} -> {'PRESSED' if pressed else 'Released'}")  # DEBUG
+        print(f"🎨 Updating GUI: Button {button} -> {'PRESSED' if pressed else 'Released'}")
 
         try:
-            if button == 'A':
-                if pressed:
-                    print(f"   → Setting Button A to PRESSED (purple)")
-                    self.button_a_frame.config(bg='#667eea', relief=tk.SUNKEN)
-                    self.button_a_label.config(bg='#667eea', fg='white')
-                    self.button_a_status.config(text="PRESSED", bg='#667eea', fg='white', font=("Arial", 11, "bold"))
-                else:
-                    print(f"   → Setting Button A to Released (white)")
-                    self.button_a_frame.config(bg='white', relief=tk.RAISED)
-                    self.button_a_label.config(bg='white', fg='black')
-                    self.button_a_status.config(text="Released", bg='white', fg='#666', font=("Arial", 11))
+            # Get the appropriate frame, label, pin label, and status widgets
+            if button == 'B':
+                frame = self.button_b_frame
+                label = self.button_b_label
+                pin_label = self.button_b_pin
+                status = self.button_b_status
+                color = '#e74c3c'  # Red for special/emergency button
+            elif button == '1':
+                frame = self.button_1_frame
+                label = self.button_1_label
+                pin_label = self.button_1_pin
+                status = self.button_1_status
+                color = '#667eea'  # Purple
+            elif button == '2':
+                frame = self.button_2_frame
+                label = self.button_2_label
+                pin_label = self.button_2_pin
+                status = self.button_2_status
+                color = '#667eea'  # Purple
+            elif button == '3':
+                frame = self.button_3_frame
+                label = self.button_3_label
+                pin_label = self.button_3_pin
+                status = self.button_3_status
+                color = '#667eea'  # Purple
+            elif button == '4':
+                frame = self.button_4_frame
+                label = self.button_4_label
+                pin_label = self.button_4_pin
+                status = self.button_4_status
+                color = '#667eea'  # Purple
+            else:
+                print(f"   ⚠️ Unknown button: {button}")
+                return
 
-            elif button == 'B':
-                if pressed:
-                    print(f"   → Setting Button B to PRESSED (purple)")
-                    self.button_b_frame.config(bg='#667eea', relief=tk.SUNKEN)
-                    self.button_b_label.config(bg='#667eea', fg='white')
-                    self.button_b_status.config(text="PRESSED", bg='#667eea', fg='white', font=("Arial", 11, "bold"))
-                else:
-                    print(f"   → Setting Button B to Released (white)")
-                    self.button_b_frame.config(bg='white', relief=tk.RAISED)
-                    self.button_b_label.config(bg='white', fg='black')
-                    self.button_b_status.config(text="Released", bg='white', fg='#666', font=("Arial", 11))
+            if pressed:
+                frame.config(bg=color, relief=tk.SUNKEN)
+                label.config(bg=color, fg='white')
+                pin_label.config(bg=color, fg='white')
+                status.config(text="PRESSED", bg=color, fg='white', font=("Arial", 10, "bold"))
+            else:
+                frame.config(bg='white', relief=tk.RAISED)
+                label.config(bg='white', fg='black')
+                pin_label.config(bg='white', fg='#999')
+                status.config(text="Released", bg='white', fg='#666', font=("Arial", 10))
 
             # Force GUI update
             self.root.update_idletasks()
@@ -383,19 +463,35 @@ class JoystickGUI:
             self.root.after(0, lambda: self.y_value_label.config(text=str(y)))
             self.root.after(0, lambda: self.update_joystick_visual(self.joystick_x, self.joystick_y))
 
-        elif uuid == BTN_A_UUID.lower():
-            pressed = data[0] == 1
-            self.button_a_pressed = pressed
-            print(f"🔘 Button A notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")  # DEBUG
-            # Fix lambda closure issue by using default argument
-            self.root.after(0, lambda p=pressed: self.update_button_display('A', p))
-
         elif uuid == BTN_B_UUID.lower():
             pressed = data[0] == 1
             self.button_b_pressed = pressed
-            print(f"🔘 Button B notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")  # DEBUG
-            # Fix lambda closure issue by using default argument
+            print(f"🔘 Button B notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")
             self.root.after(0, lambda p=pressed: self.update_button_display('B', p))
+
+        elif uuid == BTN_1_UUID.lower():
+            pressed = data[0] == 1
+            self.button_1_pressed = pressed
+            print(f"🔘 Button 1 notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")
+            self.root.after(0, lambda p=pressed: self.update_button_display('1', p))
+
+        elif uuid == BTN_2_UUID.lower():
+            pressed = data[0] == 1
+            self.button_2_pressed = pressed
+            print(f"🔘 Button 2 notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")
+            self.root.after(0, lambda p=pressed: self.update_button_display('2', p))
+
+        elif uuid == BTN_3_UUID.lower():
+            pressed = data[0] == 1
+            self.button_3_pressed = pressed
+            print(f"🔘 Button 3 notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")
+            self.root.after(0, lambda p=pressed: self.update_button_display('3', p))
+
+        elif uuid == BTN_4_UUID.lower():
+            pressed = data[0] == 1
+            self.button_4_pressed = pressed
+            print(f"🔘 Button 4 notification: {'PRESSED' if pressed else 'released'} (data={data[0]})")
+            self.root.after(0, lambda p=pressed: self.update_button_display('4', p))
 
     async def connect_ble(self):
         """Connect to BLE device"""
@@ -436,25 +532,37 @@ class JoystickGUI:
                 print("📖 Reading initial values...")
                 x_data = await client.read_gatt_char(X_CHAR_UUID)
                 y_data = await client.read_gatt_char(Y_CHAR_UUID)
-                a_data = await client.read_gatt_char(BTN_A_UUID)
                 b_data = await client.read_gatt_char(BTN_B_UUID)
+                btn_1_data = await client.read_gatt_char(BTN_1_UUID)
+                btn_2_data = await client.read_gatt_char(BTN_2_UUID)
+                btn_3_data = await client.read_gatt_char(BTN_3_UUID)
+                btn_4_data = await client.read_gatt_char(BTN_4_UUID)
 
                 self.joystick_x = int.from_bytes(x_data, byteorder='little', signed=False)
                 self.joystick_y = int.from_bytes(y_data, byteorder='little', signed=False)
 
                 print(f"   X-axis: {self.joystick_x}")
                 print(f"   Y-axis: {self.joystick_y}")
-                print(f"   Button A: {a_data[0]} ({'PRESSED' if a_data[0] == 1 else 'released'})")
                 print(f"   Button B: {b_data[0]} ({'PRESSED' if b_data[0] == 1 else 'released'})")
+                print(f"   Button 1: {btn_1_data[0]} ({'PRESSED' if btn_1_data[0] == 1 else 'released'})")
+                print(f"   Button 2: {btn_2_data[0]} ({'PRESSED' if btn_2_data[0] == 1 else 'released'})")
+                print(f"   Button 3: {btn_3_data[0]} ({'PRESSED' if btn_3_data[0] == 1 else 'released'})")
+                print(f"   Button 4: {btn_4_data[0]} ({'PRESSED' if btn_4_data[0] == 1 else 'released'})")
 
                 self.root.after(0, lambda: self.x_value_label.config(text=str(self.joystick_x)))
                 self.root.after(0, lambda: self.y_value_label.config(text=str(self.joystick_y)))
                 self.root.after(0, lambda: self.update_joystick_visual(self.joystick_x, self.joystick_y))
                 # Fix lambda closure - capture values with default arguments
-                btn_a_initial = a_data[0] == 1
                 btn_b_initial = b_data[0] == 1
-                self.root.after(0, lambda a=btn_a_initial: self.update_button_display('A', a))
+                btn_1_initial = btn_1_data[0] == 1
+                btn_2_initial = btn_2_data[0] == 1
+                btn_3_initial = btn_3_data[0] == 1
+                btn_4_initial = btn_4_data[0] == 1
                 self.root.after(0, lambda b=btn_b_initial: self.update_button_display('B', b))
+                self.root.after(0, lambda b1=btn_1_initial: self.update_button_display('1', b1))
+                self.root.after(0, lambda b2=btn_2_initial: self.update_button_display('2', b2))
+                self.root.after(0, lambda b3=btn_3_initial: self.update_button_display('3', b3))
+                self.root.after(0, lambda b4=btn_4_initial: self.update_button_display('4', b4))
 
                 # Start notifications
                 print("📡 Starting notifications...")
@@ -462,17 +570,25 @@ class JoystickGUI:
                 print("   ✅ X-axis notifications enabled")
                 await client.start_notify(Y_CHAR_UUID, self.notification_handler)
                 print("   ✅ Y-axis notifications enabled")
-                await client.start_notify(BTN_A_UUID, self.notification_handler)
-                print("   ✅ Button A notifications enabled")
                 await client.start_notify(BTN_B_UUID, self.notification_handler)
                 print("   ✅ Button B notifications enabled")
+                await client.start_notify(BTN_1_UUID, self.notification_handler)
+                print("   ✅ Button 1 notifications enabled")
+                await client.start_notify(BTN_2_UUID, self.notification_handler)
+                print("   ✅ Button 2 notifications enabled")
+                await client.start_notify(BTN_3_UUID, self.notification_handler)
+                print("   ✅ Button 3 notifications enabled")
+                await client.start_notify(BTN_4_UUID, self.notification_handler)
+                print("   ✅ Button 4 notifications enabled")
 
-                self.root.after(0, lambda: self.update_status("✅ Connected!", "green"))
+                self.root.after(0, lambda: self.update_status("✅ Connected to microbit-joy!", "green"))
                 self.root.after(0, lambda: self.connect_btn.config(text="Disconnect"))
 
                 # Enable vibration buttons
                 for btn in self.vibration_buttons:
                     self.root.after(0, lambda b=btn: b.config(state=tk.NORMAL))
+
+                print("✅ Connection complete - monitoring joystick + 5 buttons")
 
                 # Keep connection alive
                 while self.connected:
@@ -483,8 +599,11 @@ class JoystickGUI:
                 try:
                     await client.stop_notify(X_CHAR_UUID)
                     await client.stop_notify(Y_CHAR_UUID)
-                    await client.stop_notify(BTN_A_UUID)
                     await client.stop_notify(BTN_B_UUID)
+                    await client.stop_notify(BTN_1_UUID)
+                    await client.stop_notify(BTN_2_UUID)
+                    await client.stop_notify(BTN_3_UUID)
+                    await client.stop_notify(BTN_4_UUID)
                     print("   ✅ Notifications stopped")
                 except Exception as e:
                     print(f"   ⚠️ Error stopping notifications: {e}")
