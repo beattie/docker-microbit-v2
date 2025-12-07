@@ -20,26 +20,7 @@
 
 #### 1.1 Define Button Characteristics in GATT Service
 
-**Current Service** (src/main.rs:82-107):
-```rust
-#[gatt_service(uuid = "12345678-1234-5678-1234-56789abcdef0")]
-struct JoystickService {
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef1", read, notify)]
-    x_axis: u16,
-
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
-    y_axis: u16,
-}
-```
-
-**Task**: Add two new characteristics for buttons
-```rust
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
-    button_a: u8,  // 0 = released, 1 = pressed
-
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
-    button_b: u8,  // 0 = released, 1 = pressed
-```
+**Task**: Add two new characteristics for buttons to the existing JoystickService
 
 **Files to Modify**:
 - `src/main.rs:82-107` - Add button fields to `JoystickService` struct
@@ -52,23 +33,7 @@ struct JoystickService {
 
 #### 1.2 Update Shared Data Structure
 
-**Current Structure** (src/main.rs:109-114):
-```rust
-struct JoystickData {
-    x: u16,
-    y: u16,
-}
-```
-
-**Task**: Add button state fields
-```rust
-struct JoystickData {
-    x: u16,
-    y: u16,
-    button_a: u8,
-    button_b: u8,
-}
-```
+**Task**: Add button state fields to JoystickData struct
 
 **Files to Modify**:
 - `src/main.rs:109-114` - Extend `JoystickData` struct
@@ -81,38 +46,6 @@ struct JoystickData {
 #### 1.3 Create Button Reading Task
 
 **Goal**: Create a new Embassy task that reads button states and updates the signal
-
-**Task**: Implement `button_read_task()`
-```rust
-#[embassy_executor::task]
-async fn button_read_task() {
-    // Get button GPIO pins from board
-    let btn_a = ...  // Get from board.btn_a
-    let btn_b = ...  // Get from board.btn_b
-
-    // Configure as inputs with pull-up resistors
-    // micro:bit buttons are active-low (pressed = LOW)
-
-    loop {
-        // Read button states
-        let a_pressed = !btn_a.is_high();  // Invert because active-low
-        let b_pressed = !btn_b.is_high();
-
-        // Get current joystick data
-        let mut data = JOYSTICK_SIGNAL.wait().await;
-
-        // Update button states
-        data.button_a = if a_pressed { 1 } else { 0 };
-        data.button_b = if b_pressed { 1 } else { 0 };
-
-        // Signal updated data
-        JOYSTICK_SIGNAL.signal(data);
-
-        // Sample at 50Hz (20ms) for responsive button feel
-        Timer::after_millis(20).await;
-    }
-}
-```
 
 **Files to Create/Modify**:
 - `src/main.rs` - Add new task function (suggest after `joystick_read_task()`)
@@ -133,31 +66,7 @@ async fn button_read_task() {
 
 #### 1.4 Update Connection Task to Handle Buttons
 
-**Current Handling** (src/main.rs:291-321):
-```rust
-async fn connection_task(...) {
-    loop {
-        select(
-            gatt_server.next(),
-            JOYSTICK_SIGNAL.wait(),
-        ).await;
-
-        // Only updates x_axis and y_axis
-    }
-}
-```
-
-**Task**: Add button notification logic
-```rust
-// After updating x_axis and y_axis
-if let Err(e) = service.button_a_notify(&conn, &data.button_a) {
-    defmt::warn!("Failed to notify button A: {}", e);
-}
-
-if let Err(e) = service.button_b_notify(&conn, &data.button_b) {
-    defmt::warn!("Failed to notify button B: {}", e);
-}
-```
+**Task**: Add button notification logic to connection_task
 
 **Files to Modify**:
 - `src/main.rs:291-321` - Update `connection_task()` notification logic
@@ -249,42 +158,6 @@ touch lib.rs gatt.rs tasks/mod.rs tasks/ble.rs tasks/joystick.rs tasks/led.rs
 
 **Move**: `JoystickService` struct and `JoystickData` from main.rs to gatt.rs
 
-**src/gatt.rs**:
-```rust
-use trouble_host::prelude::*;
-
-/// GATT Service for Joystick with Buttons
-#[gatt_service(uuid = "12345678-1234-5678-1234-56789abcdef0")]
-pub struct JoystickService {
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef1", read, notify)]
-    pub x_axis: u16,
-
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
-    pub y_axis: u16,
-
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
-    pub button_a: u8,
-
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
-    pub button_b: u8,
-}
-
-/// Shared data structure for joystick state
-#[derive(Clone, Copy)]
-pub struct JoystickData {
-    pub x: u16,
-    pub y: u16,
-    pub button_a: u8,
-    pub button_b: u8,
-}
-```
-
-**src/main.rs**: Add module declaration
-```rust
-mod gatt;
-use gatt::{JoystickService, JoystickData};
-```
-
 **Files to Create**:
 - `src/gatt.rs` - New file with service definitions
 
@@ -299,85 +172,6 @@ use gatt::{JoystickService, JoystickData};
 
 **Goal**: Move each async task to its own module
 
-**src/tasks/led.rs**:
-```rust
-use embassy_executor::Spawner;
-use embassy_time::Timer;
-use microbit_bsp::Microbit;
-
-#[embassy_executor::task]
-pub async fn led_blink_task(mut led: /* type */) {
-    // Move led_blink_task implementation here
-}
-```
-
-**src/tasks/joystick.rs**:
-```rust
-use embassy_executor::Spawner;
-use embassy_time::Timer;
-use embassy_sync::signal::Signal;
-use crate::gatt::JoystickData;
-
-pub static JOYSTICK_SIGNAL: Signal<ThreadModeRawMutex, JoystickData> = Signal::new();
-
-#[embassy_executor::task]
-pub async fn joystick_read_task(/* params */) {
-    // Move joystick_read_task implementation here
-}
-
-#[embassy_executor::task]
-pub async fn button_read_task(/* params */) {
-    // Move button_read_task implementation here
-}
-```
-
-**src/tasks/ble.rs**:
-```rust
-use embassy_executor::Spawner;
-use trouble_host::prelude::*;
-use crate::gatt::{JoystickService, JoystickData};
-use crate::tasks::joystick::JOYSTICK_SIGNAL;
-
-#[embassy_executor::task]
-pub async fn mpsl_task(/* params */) { /* ... */ }
-
-#[embassy_executor::task]
-pub async fn ble_runner_task(/* params */) { /* ... */ }
-
-#[embassy_executor::task]
-pub async fn ble_app_task(/* params */) { /* ... */ }
-
-async fn connection_task(/* params */) { /* ... */ }
-
-async fn advertise(/* params */) { /* ... */ }
-```
-
-**src/tasks/mod.rs**:
-```rust
-pub mod led;
-pub mod joystick;
-pub mod ble;
-
-pub use led::led_blink_task;
-pub use joystick::{joystick_read_task, button_read_task, JOYSTICK_SIGNAL};
-pub use ble::{mpsl_task, ble_runner_task, ble_app_task};
-```
-
-**src/main.rs** (simplified):
-```rust
-mod gatt;
-mod tasks;
-
-use gatt::{JoystickService, JoystickData};
-use tasks::*;
-
-#[embassy_executor::main]
-async fn main(spawner: Spawner) {
-    // Initialize hardware
-    // Spawn tasks
-}
-```
-
 **Files to Create**:
 - `src/tasks/mod.rs`, `src/tasks/led.rs`, `src/tasks/joystick.rs`, `src/tasks/ble.rs`
 
@@ -391,30 +185,6 @@ async fn main(spawner: Spawner) {
 #### 2.4 Create Shared Library Module
 
 **Goal**: Centralize constants and shared types
-
-**src/lib.rs**:
-```rust
-#![no_std]
-
-/// BLE device name advertised to clients
-pub const DEVICE_NAME: &str = "microbit-joy";
-
-/// Joystick update interval (milliseconds)
-pub const JOYSTICK_UPDATE_MS: u64 = 100;
-
-/// Button polling interval (milliseconds)
-pub const BUTTON_UPDATE_MS: u64 = 20;
-
-// Re-export common types
-pub use gatt::{JoystickService, JoystickData};
-
-pub mod gatt;
-```
-
-**Usage in main.rs**:
-```rust
-use microbit_ble_dev::{DEVICE_NAME, JOYSTICK_UPDATE_MS};
-```
 
 **Files to Create**:
 - `src/lib.rs` - Shared library definitions
@@ -474,15 +244,8 @@ cargo run --release
 
 #### 3.2 Define Battery Service in GATT
 
-**src/gatt.rs**: Add new service
-```rust
-/// Standard Bluetooth Battery Service
-#[gatt_service(uuid = "180F")]  // Note: 16-bit UUID for standard service
-pub struct BatteryService {
-    #[characteristic(uuid = "2A19", read, notify)]
-    pub battery_level: u8,  // 0-100%
-}
-```
+**Files to Modify**:
+- `src/gatt.rs` - Add BatteryService definition
 
 **Learning**:
 - TrouBLE supports both 16-bit and 128-bit UUIDs
@@ -496,47 +259,6 @@ pub struct BatteryService {
 - Powered by USB (5V) or battery pack (2x AAA = 3V)
 - nRF52833 VDD range: 1.7V - 3.6V
 - Internal voltage: Accessible via SAADC channel VDD with 1/6 prescaler
-
-**Task**: Create battery reading function
-```rust
-// In src/tasks/joystick.rs or new src/tasks/battery.rs
-
-use embassy_nrf::saadc::{Saadc, Config, ChannelConfig, VddInput};
-
-async fn read_battery_voltage(saadc: &mut Saadc) -> u8 {
-    // Configure SAADC for VDD measurement
-    // VDD measurement gives internal voltage (1.7-3.6V range)
-
-    // Read raw ADC value (12-bit = 0-4095)
-    let raw = saadc.sample(&VddInput).await;
-
-    // Convert to voltage (mV)
-    // VDD/6 with 0.6V reference => voltage = raw * 6 * 600 / 4095
-    let voltage_mv = (raw as u32 * 3600) / 4095;
-
-    // Map to percentage (assume 3.0V = 100%, 2.2V = 0%)
-    let percent = if voltage_mv >= 3000 {
-        100
-    } else if voltage_mv <= 2200 {
-        0
-    } else {
-        ((voltage_mv - 2200) * 100 / 800) as u8
-    };
-
-    percent
-}
-
-#[embassy_executor::task]
-pub async fn battery_read_task(/* saadc, signal */) {
-    loop {
-        let level = read_battery_voltage(&mut saadc).await;
-        BATTERY_SIGNAL.signal(level);
-
-        // Update every 60 seconds (battery changes slowly)
-        Timer::after_secs(60).await;
-    }
-}
-```
 
 **Challenge**: SAADC is already used by joystick_read_task
 - **Option A**: Share SAADC via mutex
@@ -555,21 +277,6 @@ pub async fn battery_read_task(/* saadc, signal */) {
 
 #### 3.4 Add Battery Service to GATT Server
 
-**Current** (src/tasks/ble.rs):
-```rust
-let server = gatt_server.build(&gatt_resources)
-    .add_service(JoystickService::new())
-    .build();
-```
-
-**Update**: Add battery service
-```rust
-let server = gatt_server.build(&gatt_resources)
-    .add_service(JoystickService::new())
-    .add_service(BatteryService::new())
-    .build();
-```
-
 **Files to Modify**:
 - `src/tasks/ble.rs` - Update server builder
 - `src/gatt.rs` - Add `BatteryService` definition
@@ -579,22 +286,6 @@ let server = gatt_server.build(&gatt_resources)
 ---
 
 #### 3.5 Update Connection Task for Battery Notifications
-
-**src/tasks/ble.rs** - connection_task():
-```rust
-// Add battery signal to select
-select3(
-    gatt_server.next(),
-    JOYSTICK_SIGNAL.wait(),
-    BATTERY_SIGNAL.wait(),
-).await;
-
-// Handle battery update
-let battery_level = BATTERY_SIGNAL.wait().await;
-if let Err(e) = battery_service.battery_level_notify(&conn, &battery_level) {
-    defmt::warn!("Failed to notify battery level: {}", e);
-}
-```
 
 **Files to Modify**:
 - `src/tasks/ble.rs` - Extend connection task
@@ -655,25 +346,6 @@ print(f"Battery Level: {level[0]}%")
 
 **Goal**: Allow BLE clients to configure device behavior
 
-**src/gatt.rs**: Add new service
-```rust
-/// Configuration Service for Runtime Settings
-#[gatt_service(uuid = "12345678-1234-5678-1234-56789abcde00")]
-pub struct ConfigService {
-    /// Joystick update rate (milliseconds): 10-1000ms
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcde01", read, write, notify)]
-    pub update_rate_ms: u16,
-
-    /// Device name (max 20 bytes UTF-8)
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcde02", read, write, notify)]
-    pub device_name: [u8; 20],
-
-    /// LED blink enable: 0=off, 1=on
-    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcde03", read, write, notify)]
-    pub led_enabled: u8,
-}
-```
-
 **Files to Create/Modify**:
 - `src/gatt.rs` - Add ConfigService
 
@@ -685,31 +357,6 @@ pub struct ConfigService {
 
 **Goal**: Shared state for runtime configuration
 
-**src/lib.rs** or **src/gatt.rs**:
-```rust
-use embassy_sync::signal::Signal;
-use embassy_sync::mutex::Mutex;
-
-/// Runtime configuration state
-pub struct Config {
-    pub joystick_update_ms: u16,
-    pub device_name: heapless::String<20>,
-    pub led_enabled: bool,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            joystick_update_ms: 100,
-            device_name: heapless::String::from("microbit-joy"),
-            led_enabled: true,
-        }
-    }
-}
-
-pub static CONFIG: Mutex<ThreadModeRawMutex, Config> = Mutex::new(Config::default());
-```
-
 **Learning**:
 - `heapless::String<N>` for fixed-size strings without heap
 - `Mutex` for thread-safe shared state
@@ -720,42 +367,6 @@ pub static CONFIG: Mutex<ThreadModeRawMutex, Config> = Mutex::new(Config::defaul
 #### 4.3 Handle WRITE Events in Connection Task
 
 **Goal**: React to client writes and update configuration
-
-**src/tasks/ble.rs** - connection_task():
-```rust
-loop {
-    match select(gatt_server.next(), JOYSTICK_SIGNAL.wait()).await {
-        Either::First(event) => {
-            match event {
-                GattEvent::Write { handle, data } => {
-                    // Identify which characteristic was written
-                    if handle == config_service.update_rate_ms_handle() {
-                        let new_rate = u16::from_le_bytes([data[0], data[1]]);
-
-                        // Validate range (10-1000ms)
-                        if new_rate >= 10 && new_rate <= 1000 {
-                            let mut config = CONFIG.lock().await;
-                            config.joystick_update_ms = new_rate;
-
-                            defmt::info!("Update rate changed to {}ms", new_rate);
-
-                            // Notify other clients of the change
-                            config_service.update_rate_ms_notify(&conn, &new_rate)?;
-                        } else {
-                            defmt::warn!("Invalid update rate: {}", new_rate);
-                        }
-                    }
-                    // Handle other writable characteristics...
-                }
-                // Other events...
-            }
-        }
-        Either::Second(joystick_data) => {
-            // Existing joystick update logic...
-        }
-    }
-}
-```
 
 **Files to Modify**:
 - `src/tasks/ble.rs` - Add GattEvent::Write handling
@@ -773,53 +384,8 @@ loop {
 **Challenge**: Tasks are already running with fixed timing
 
 **Solution Options**:
-
-**Option A**: Restart tasks (complex)
-**Option B**: Use dynamic timer (simpler)
-
-**src/tasks/joystick.rs** - Update joystick_read_task:
-```rust
-#[embassy_executor::task]
-pub async fn joystick_read_task(/* params */) {
-    // ... calibration ...
-
-    loop {
-        // Read joystick...
-        // Update signal...
-
-        // Dynamic delay based on config
-        let delay = {
-            let config = CONFIG.lock().await;
-            config.joystick_update_ms
-        };
-        Timer::after_millis(delay as u64).await;
-    }
-}
-```
-
-**src/tasks/led.rs** - Update led_blink_task:
-```rust
-#[embassy_executor::task]
-pub async fn led_blink_task(mut led: /* ... */) {
-    // Startup blinks...
-
-    loop {
-        let enabled = {
-            let config = CONFIG.lock().await;
-            config.led_enabled
-        };
-
-        if enabled {
-            led.set_high();
-            Timer::after_millis(500).await;
-            led.set_low();
-            Timer::after_millis(500).await;
-        } else {
-            Timer::after_millis(1000).await;  // Still yield
-        }
-    }
-}
-```
+- **Option A**: Restart tasks (complex)
+- **Option B**: Use dynamic timer (simpler)
 
 **Files to Modify**:
 - `src/tasks/joystick.rs` - Dynamic update rate
@@ -838,33 +404,6 @@ pub async fn led_blink_task(mut led: /* ... */) {
 **Solutions**:
 1. **Store only**: Save new name, apply on next advertising cycle
 2. **Reconnect required**: Disconnect client to trigger re-advertising with new name
-
-**src/tasks/ble.rs** - ble_app_task():
-```rust
-async fn advertise(peripheral: &Peripheral, config: &Config) {
-    let adv_data = [
-        0x02, 0x01, AdFlags::LE_GENERAL_DISCOVERABLE.into_bits(),
-
-        // Dynamic name length
-        (config.device_name.len() + 1) as u8,
-        0x09,  // Complete Local Name
-        // Copy name bytes...
-    ];
-
-    // Start advertising with dynamic name
-}
-
-#[embassy_executor::task]
-pub async fn ble_app_task(/* ... */) {
-    loop {
-        let config = CONFIG.lock().await;
-        advertise(&peripheral, &config).await;
-        drop(config);  // Release lock
-
-        // Accept connection...
-    }
-}
-```
 
 **Files to Modify**:
 - `src/tasks/ble.rs` - Dynamic advertising data
