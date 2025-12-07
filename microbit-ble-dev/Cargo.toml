@@ -1,0 +1,28 @@
+[package]
+name = "microbit-ble-dev"
+authors = [ "Brian Beattie<beattie@beattie-home.net>" ]
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+microbit-bsp = { version = "0.4.0", features = ["trouble"] }
+embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread", "task-arena-size-32768"] }
+embassy-time = { version = "0.4.0" }
+embassy-futures = { version = "0.1.1" }
+embassy-sync = { version = "0.7.0", features = ["defmt"] }
+embassy-nrf = { version = "0.4.1", features = ["nrf52833", "time-driver-rtc1", "gpiote"] }
+trouble-host = { version = "0.2.0", features = ["defmt", "gatt", "peripheral"] }
+static_cell = "2"
+defmt = "1.0.1"
+defmt-rtt = "1.1.0"
+panic-probe = { version = "1.0.0", features = ["print-defmt"] }
+cortex-m = { version = "0.7.7", features = ["inline-asm"] }
+cortex-m-rt = "0.7.5"
+heapless = { version = "0.9.1", default-features = false }
+nb = "1.1.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = 2

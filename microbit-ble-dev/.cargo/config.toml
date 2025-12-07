@@ -1,0 +1,19 @@
+[build]
+target = "thumbv7em-none-eabihf"
+
+[target.thumbv7em-none-eabihf]
+runner = "probe-rs run --chip nRF52833_xxAA"
+rustflags = [
+  "-C", "linker=rust-lld",
+  "-C", "link-arg=-Tlink.x",
+]
+
+[env]
+DEFMT_LOG = "info"
+
+# Convenient aliases for embedded development
+# (Can't override built-in commands, so use short names)
+[alias]
+b = "build --release"           # cargo b
+r = "run --release"             # cargo r
+f = "flash --release --chip nRF52833_xxAA"  # cargo f
