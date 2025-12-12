@@ -1,12 +1,12 @@
 #![no_std]
 #![no_main]
 
-use defmt::{info, warn, error, Debug2Format};
+use defmt::{error, info, warn, Debug2Format};
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Timer};
-use embassy_sync::signal::Signal;
-use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
 use embassy_futures::select::select;
+use embassy_sync::blocking_mutex::raw::ThreadModeRawMutex;
+use embassy_sync::signal::Signal;
+use embassy_time::{Duration, Timer};
 use microbit_bsp::{ble::MultiprotocolServiceLayer, display, Config, Microbit};
 use trouble_host::prelude::*;
 use {defmt_rtt as _, panic_probe as _};
@@ -14,8 +14,10 @@ use {defmt_rtt as _, panic_probe as _};
 // Joystick data structure for sharing between tasks
 #[derive(Clone, Copy, Debug, defmt::Format)]
 struct JoystickData {
-    x: u16,  // 0-1023 range, center at 512
-    y: u16,  // 0-1023 range, center at 512
+    x: u16,       // 0-1023 range, center at 512
+    y: u16,       // 0-1023 range, center at 512
+    button_a: u8, // 0 = released, 1 = pressed
+    button_b: u8, // 0 = released, 1 = pressed
 }
 
 // Global signal for joystick data (always latest value)
@@ -41,6 +43,12 @@ struct JoystickService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef2", read, notify)]
     y_axis: u16,
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef3", read, notify)]
+    button_a: u8,
+
+    #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
+    button_b: u8,
 }
 
 #[embassy_executor::task]
@@ -84,8 +92,8 @@ async fn joystick_read_task(
     info!("✓ Joystick ADC task started");
     info!("Joystick pins: P1 (X-axis), P2 (Y-axis)");
 
-    use embassy_nrf::saadc::{ChannelConfig, Config, Saadc, Resolution, Oversample};
     use embassy_nrf::bind_interrupts;
+    use embassy_nrf::saadc::{ChannelConfig, Config, Oversample, Resolution, Saadc};
 
     bind_interrupts!(struct Irqs {
         SAADC => embassy_nrf::saadc::InterruptHandler;
@@ -126,7 +134,10 @@ async fn joystick_read_task(
     let x_center = (x_cal_sum / 10) as i16;
     let y_center = (y_cal_sum / 10) as i16;
 
-    info!("✓ Calibration complete: X_center={}, Y_center={}", x_center, y_center);
+    info!(
+        "✓ Calibration complete: X_center={}, Y_center={}",
+        x_center, y_center
+    );
     info!("Starting joystick readings (reading every 100ms)...");
 
     let mut buf = [0i16; 2];
@@ -158,6 +169,8 @@ async fn joystick_read_task(
         let joystick_data = JoystickData {
             x: x_value,
             y: y_value,
+            button_a: 0, // Will be updated by button_read_task
+            button_b: 0, // Will be updated by button_read_task
         };
         JOYSTICK_SIGNAL.signal(joystick_data);
 
@@ -206,6 +219,36 @@ async fn joystick_read_task(
     }
 }
 
+#[embassy_executor::task]
+async fn button_read_task(
+    btn_a: embassy_nrf::gpio::Input<'static>,
+    btn_b: embassy_nrf::gpio::Input<'static>,
+) {
+    use embassy_time::{Duration, Timer};
+
+    info!("✓ Button task started");
+    info!("Button pins configured from board (active-low)");
+
+    loop {
+        // Read button states (active-low: pressed = LOW)
+        let a_pressed = if btn_a.is_low() { 1u8 } else { 0u8 };
+        let b_pressed = if btn_b.is_low() { 1u8 } else { 0u8 };
+
+        // Get current joystick data from signal
+        let mut current_data = JOYSTICK_SIGNAL.wait().await;
+
+        // Update button states
+        current_data.button_a = a_pressed;
+        current_data.button_b = b_pressed;
+
+        // Send updated data back
+        JOYSTICK_SIGNAL.signal(current_data);
+
+        // 20ms sampling provides natural debouncing
+        Timer::after(Duration::from_millis(20)).await;
+    }
+}
+
 // MPSL task - required to run BLE stack
 #[embassy_executor::task]
 async fn mpsl_task(mpsl: &'static MultiprotocolServiceLayer<'static>) -> ! {
@@ -251,13 +294,20 @@ async fn advertise<'a, 'b, C: Controller>(
 }
 
 // Handle GATT connection and send joystick notifications
-async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &GattConnection<'_, '_, P>) {
+async fn connection_task<P: PacketPool>(
+    server: &JoystickServer<'_>,
+    conn: &GattConnection<'_, '_, P>,
+) {
     let x_char = server.joystick_service.x_axis;
     let y_char = server.joystick_service.y_axis;
+    let btn_a_char = server.joystick_service.button_a;
+    let btn_b_char = server.joystick_service.button_b;
 
     // Set initial values
     let _ = x_char.set(server, &512);
     let _ = y_char.set(server, &512);
+    let _ = btn_a_char.set(server, &0u8);
+    let _ = btn_b_char.set(server, &0u8);
 
     info!("[BLE] Starting notification loop...");
 
@@ -267,27 +317,27 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
         let joystick_update_future = JOYSTICK_SIGNAL.wait();
 
         match select(gatt_event_future, joystick_update_future).await {
-            embassy_futures::select::Either::First(event) => {
-                match event {
-                    GattConnectionEvent::Disconnected { reason } => {
-                        info!("[BLE] Disconnected: {:?}", reason);
-                        break;
-                    }
-                    GattConnectionEvent::Gatt { event } => {
-                        match event.accept() {
-                            Ok(reply) => reply.send().await,
-                            Err(e) => warn!("[BLE] Error sending response: {:?}", e),
-                        }
-                    }
-                    _ => {}
+            embassy_futures::select::Either::First(event) => match event {
+                GattConnectionEvent::Disconnected { reason } => {
+                    info!("[BLE] Disconnected: {:?}", reason);
+                    break;
                 }
-            }
+                GattConnectionEvent::Gatt { event } => match event.accept() {
+                    Ok(reply) => reply.send().await,
+                    Err(e) => warn!("[BLE] Error sending response: {:?}", e),
+                },
+                _ => {}
+            },
             embassy_futures::select::Either::Second(data) => {
                 // Update characteristic values and notify
                 let _ = x_char.set(server, &data.x);
                 let _ = y_char.set(server, &data.y);
                 let _ = x_char.notify(conn, &data.x).await;
                 let _ = y_char.notify(conn, &data.y).await;
+                let _ = btn_a_char.set(server, &data.button_a);
+                let _ = btn_b_char.set(server, &data.button_b);
+                let _ = btn_a_char.notify(conn, &data.button_a).await;
+                let _ = btn_b_char.notify(conn, &data.button_b).await;
             }
         }
     }
@@ -296,9 +346,7 @@ async fn connection_task<P: PacketPool>(server: &JoystickServer<'_>, conn: &Gatt
 }
 
 // Main BLE application task
-async fn ble_app_task<C: Controller>(
-    mut peripheral: Peripheral<'_, C, DefaultPacketPool>,
-) {
+async fn ble_app_task<C: Controller>(mut peripheral: Peripheral<'_, C, DefaultPacketPool>) {
     info!("[BLE] Creating GATT server...");
 
     let server = JoystickServer::new_with_config(GapConfig::Peripheral(PeripheralConfig {
@@ -346,6 +394,13 @@ async fn main(spawner: Spawner) {
         Err(_) => error!("✗ Failed to spawn joystick task"),
     }
 
+    // Spawn button reading task
+    info!("Spawning button task...");
+    match spawner.spawn(button_read_task(board.btn_a, board.btn_b)) {
+        Ok(_) => info!("✓ Button task spawned"),
+        Err(_) => error!("✗ Failed to spawn button task"),
+    }
+
     // Initialize BLE stack
     info!("Initializing BLE stack...");
     let (sdc, mpsl) = board
@@ -366,9 +421,7 @@ async fn main(spawner: Spawner) {
     let stack = trouble_host::new(sdc, &mut resources).set_random_address(address);
 
     let Host {
-        peripheral,
-        runner,
-        ..
+        peripheral, runner, ..
     } = stack.build();
 
     info!("✓ BLE Host stack created");
