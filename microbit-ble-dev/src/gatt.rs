@@ -31,6 +31,7 @@ pub const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 pub struct JoystickServer {
     pub joystick_service: JoystickService,
     pub battery_service: BatteryService,
+    pub config_service: ConfigService,
 }
 
 // Custom Joystick Service
@@ -54,4 +55,21 @@ pub struct JoystickService {
 pub struct BatteryService {
     #[characteristic(uuid = "2A19", read, notify)]
     pub battery_level: u8, // 0-100%
+}
+
+// Configuration Service (Custom)
+// Allows BLE clients to configure device behavior at runtime
+#[gatt_service(uuid = "87654321-4321-8765-4321-fedcba987654")]
+pub struct ConfigService {
+    // Joystick update rate in milliseconds (50-1000ms)
+    #[characteristic(uuid = "87654321-4321-8765-4321-fedcba987655", read, write, notify)]
+    pub update_rate_ms: u16,
+
+    // LED blinking enabled (0=disabled, 1=enabled)
+    #[characteristic(uuid = "87654321-4321-8765-4321-fedcba987656", read, write, notify)]
+    pub led_enabled: u8,
+
+    // Device name (max 20 characters, requires reconnect to take effect)
+    #[characteristic(uuid = "87654321-4321-8765-4321-fedcba987657", read, write, notify)]
+    pub device_name: [u8; 20],
 }

@@ -1,6 +1,8 @@
 use defmt::info;
-use embassy_time::Duration;
+use embassy_time::{Duration, Timer};
 use microbit_bsp::display;
+
+use crate::config::CONFIG;
 
 #[embassy_executor::task]
 pub async fn led_blink_task(
@@ -30,8 +32,22 @@ pub async fn led_blink_task(
     info!("LED entering main blink loop...");
 
     // Main LED blink loop - slower to indicate system running
+    // Can be disabled via BLE configuration
     loop {
-        display.display(top_row, Duration::from_millis(500)).await;
-        display.display(all_off, Duration::from_millis(500)).await;
+        // Check if LED is enabled
+        let enabled = {
+            let config = CONFIG.lock().await;
+            config.led_enabled
+        };
+
+        if enabled {
+            // LED enabled - normal blinking
+            display.display(top_row, Duration::from_millis(500)).await;
+            display.display(all_off, Duration::from_millis(500)).await;
+        } else {
+            // LED disabled - keep it off and just wait
+            display.display(all_off, Duration::from_millis(1)).await;
+            Timer::after(Duration::from_millis(500)).await;
+        }
     }
 }

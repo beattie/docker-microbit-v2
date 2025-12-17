@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 
+mod config;
 mod gatt;
 mod tasks;
 
@@ -26,6 +27,13 @@ async fn main(spawner: Spawner) {
     info!("=================================");
 
     let board = Microbit::new(Config::default());
+
+    // Initialize device configuration
+    {
+        let mut cfg = config::CONFIG.lock().await;
+        cfg.device_name = heapless::String::try_from("microbit-joy")
+            .expect("Device name too long");
+    }
 
     info!("Initializing peripherals...");
 

@@ -3,6 +3,7 @@
 use defmt::info;
 use embassy_time::{Duration, Timer};
 // Import the signal and data type from gatt module
+use crate::config::CONFIG;
 use crate::gatt::{JoystickData, JOYSTICK_SIGNAL};
 
 #[embassy_executor::task]
@@ -155,8 +156,12 @@ pub async fn joystick_read_task(
             }
         }
 
-        // Sample rate: 10Hz (100ms between readings)
-        Timer::after(Duration::from_millis(100)).await;
+        // Dynamic sample rate from CONFIG (default 100ms = 10Hz)
+        let rate_ms = {
+            let config = CONFIG.lock().await;
+            config.update_rate_ms
+        };
+        Timer::after(Duration::from_millis(rate_ms as u64)).await;
     }
 }
 
