@@ -3,7 +3,7 @@
 use defmt::info;
 use embassy_time::{Duration, Timer};
 // Import the signal and data type from gatt module
-use crate::gatt::{JOYSTICK_SIGNAL, JoystickData};
+use crate::gatt::{JoystickData, JOYSTICK_SIGNAL};
 
 #[embassy_executor::task]
 pub async fn joystick_read_task(
@@ -15,7 +15,7 @@ pub async fn joystick_read_task(
     info!("Joystick pins: P1 (X-axis), P2 (Y-axis)");
 
     use embassy_nrf::bind_interrupts;
-    use embassy_nrf::saadc::{ChannelConfig, Config, Oversample, Resolution, Saadc};
+    use embassy_nrf::saadc::{ChannelConfig, Config, Oversample, Resolution, Saadc, VddInput};
 
     bind_interrupts!(struct Irqs {
         SAADC => embassy_nrf::saadc::InterruptHandler;
@@ -26,14 +26,15 @@ pub async fn joystick_read_task(
     config.resolution = Resolution::_12BIT;
     config.oversample = Oversample::OVER4X;
 
-    // Initialize SAADC with 2 channels
+    // Initialize SAADC with 3 channels
     let mut adc = Saadc::new(
         saadc,
         Irqs,
         config,
         [
-            ChannelConfig::single_ended(p1),
-            ChannelConfig::single_ended(p2),
+            ChannelConfig::single_ended(p1),       // Channel 0: X-axis
+            ChannelConfig::single_ended(p2),       // Channel 1: Y-axis
+            ChannelConfig::single_ended(VddInput), // Channel 2: VDD (battery voltage)
         ],
     );
 
@@ -42,7 +43,7 @@ pub async fn joystick_read_task(
     info!("Please do not touch the joystick during calibration...");
 
     // Take several samples to find center position
-    let mut cal_buf = [0i16; 2];
+    let mut cal_buf = [0i16; 3];
     let mut x_cal_sum = 0i32;
     let mut y_cal_sum = 0i32;
 
@@ -62,15 +63,30 @@ pub async fn joystick_read_task(
     );
     info!("Starting joystick readings (reading every 100ms)...");
 
-    let mut buf = [0i16; 2];
+    let mut buf = [0i16; 3];
     let mut count = 0u32;
 
     loop {
-        // Read both ADC channels
+        // Read all 3 ADC channels
         adc.sample(&mut buf).await;
 
         let x_raw = buf[0];
         let y_raw = buf[1];
+        let vdd_raw = buf[2];
+
+        // Calculate actual battery voltage from VDD reading
+        // VDD channel uses 1/6 gain, 0.6V reference, 12-bit resolution
+        // Formula: voltage_mv = (vdd_raw * 600 * 6) / 4095
+        let voltage_mv = (vdd_raw as i32 * 600 * 6) / 4095;
+
+        // Convert voltage to battery percentage (2.0V = 0%, 3.0V = 100%)
+        let battery_level = if voltage_mv >= 3000 {
+            100
+        } else if voltage_mv <= 2000 {
+            0
+        } else {
+            ((voltage_mv - 2000) * 100 / 1000) as u8
+        };
 
         // Calculate deviation from calibrated center
         let x_delta = x_raw - x_center;
@@ -93,13 +109,14 @@ pub async fn joystick_read_task(
             y: y_value,
             button_a: 0, // Will be updated by button_read_task
             button_b: 0, // Will be updated by button_read_task
+            battery_level,
         };
         JOYSTICK_SIGNAL.signal(joystick_data);
 
         // Log every 10th reading to reduce console output
         if count % 10 == 0 {
             info!(
-                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={})",
+                "Joy {}: X={} (raw={} delta={} c={}), Y={} (raw={} delta={} c={}), Batt={}% ({}mV)",
                 count / 5,
                 x_value,
                 x_raw,
@@ -108,7 +125,9 @@ pub async fn joystick_read_task(
                 y_value,
                 y_raw,
                 y_delta,
-                y_centered
+                y_centered,
+                battery_level,
+                voltage_mv
             );
 
             // Detect significant movements (threshold = 150 from center, with deadzone of 50)

@@ -26,6 +26,10 @@ Y_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef2"
 BTN_A_UUID = "12345678-1234-5678-1234-56789abcdef3"
 BTN_B_UUID = "12345678-1234-5678-1234-56789abcdef4"
 
+# Battery Service UUIDs (Standard Bluetooth SIG)
+BATTERY_SERVICE_UUID = "0000180f-0000-1000-8000-00805f9b34fb"
+BATTERY_LEVEL_UUID = "00002a19-0000-1000-8000-00805f9b34fb"
+
 # Device name to search for
 DEVICE_NAME = "microbit-joy"
 
@@ -34,11 +38,12 @@ joystick_x = 512
 joystick_y = 512
 button_a_state = "released"
 button_b_state = "released"
+battery_level = 100
 
 
 def notification_handler(sender, data):
     """Handle notifications from all characteristics"""
-    global joystick_x, joystick_y, button_a_state, button_b_state
+    global joystick_x, joystick_y, button_a_state, button_b_state, battery_level
 
     uuid = sender.uuid.lower()
 
@@ -46,7 +51,7 @@ def notification_handler(sender, data):
         # X-axis is u16 (little-endian)
         joystick_x = int.from_bytes(data, byteorder='little', signed=False)
         print(f"📍 Joystick X: {joystick_x:4d}", end="")
-        print(f"  Y: {joystick_y:4d}  |  Button A: {button_a_state:8s}  Button B: {button_b_state:8s}")
+        print(f"  Y: {joystick_y:4d}  |  A: {button_a_state:8s}  B: {button_b_state:8s}  🔋 {battery_level}%")
 
     elif uuid == Y_CHAR_UUID.lower():
         # Y-axis is u16 (little-endian)
@@ -69,6 +74,13 @@ def notification_handler(sender, data):
             print(f"🔘 Button B: PRESSED")
         else:
             print(f"   Button B: released")
+
+    elif uuid == BATTERY_LEVEL_UUID.lower():
+        # Battery level is u8 (0-100%)
+        battery_level = data[0]
+        bars = int(battery_level / 10)
+        battery_bar = "█" * bars + "░" * (10 - bars)
+        print(f"🔋 Battery: {battery_level:3d}% [{battery_bar}]")
 
 
 async def read_initial_values(client):
@@ -94,6 +106,16 @@ async def read_initial_values(client):
     btn_b_data = await client.read_gatt_char(BTN_B_UUID)
     btn_b = "PRESSED" if btn_b_data[0] == 1 else "released"
     print(f"   Button B: {btn_b}")
+
+    # Read Battery Level
+    try:
+        batt_data = await client.read_gatt_char(BATTERY_LEVEL_UUID)
+        batt_level = batt_data[0]
+        bars = int(batt_level / 10)
+        battery_bar = "█" * bars + "░" * (10 - bars)
+        print(f"   Battery: {batt_level}% [{battery_bar}]")
+    except Exception as e:
+        print(f"   Battery: (not available)")
 
 
 async def main():
@@ -144,8 +166,12 @@ async def main():
             await client.start_notify(Y_CHAR_UUID, notification_handler)
             await client.start_notify(BTN_A_UUID, notification_handler)
             await client.start_notify(BTN_B_UUID, notification_handler)
+            try:
+                await client.start_notify(BATTERY_LEVEL_UUID, notification_handler)
+                print("✅ Monitoring joystick, buttons, and battery...")
+            except:
+                print("✅ Monitoring joystick and buttons (battery not available)...")
 
-            print("✅ Monitoring joystick and buttons...")
             print("\nMove the joystick and press buttons A/B on the micro:bit")
             print("Press Ctrl+C to stop\n")
             print("-" * 60)
@@ -162,6 +188,10 @@ async def main():
             await client.stop_notify(Y_CHAR_UUID)
             await client.stop_notify(BTN_A_UUID)
             await client.stop_notify(BTN_B_UUID)
+            try:
+                await client.stop_notify(BATTERY_LEVEL_UUID)
+            except:
+                pass
 
             print("✅ Disconnected")
 

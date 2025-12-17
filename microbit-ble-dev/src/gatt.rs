@@ -10,10 +10,11 @@ use trouble_host::prelude::*;
 // Joystick data structure for sharing between tasks
 #[derive(Clone, Copy, Debug, defmt::Format)]
 pub struct JoystickData {
-    pub x: u16,       // 0-1023 range, center at 512
-    pub y: u16,       // 0-1023 range, center at 512
-    pub button_a: u8, // 0 = released, 1 = pressed
-    pub button_b: u8, // 0 = released, 1 = pressed
+    pub x: u16,            // 0-1023 range, center at 512
+    pub y: u16,            // 0-1023 range, center at 512
+    pub button_a: u8,      // 0 = released, 1 = pressed
+    pub button_b: u8,      // 0 = released, 1 = pressed
+    pub battery_level: u8, // 0-100
 }
 
 // Global signal for joystick data (always latest value)
@@ -29,6 +30,7 @@ pub const L2CAP_CHANNELS_MAX: usize = 2; // Signal + att
 #[gatt_server]
 pub struct JoystickServer {
     pub joystick_service: JoystickService,
+    pub battery_service: BatteryService,
 }
 
 // Custom Joystick Service
@@ -45,4 +47,11 @@ pub struct JoystickService {
 
     #[characteristic(uuid = "12345678-1234-5678-1234-56789abcdef4", read, notify)]
     pub button_b: u8,
+}
+
+// Standard Battery Service (Bluetooth SIG)
+#[gatt_service(uuid = "180F")] // - Standard 16-bit UUID!
+pub struct BatteryService {
+    #[characteristic(uuid = "2A19", read, notify)]
+    pub battery_level: u8, // 0-100%
 }

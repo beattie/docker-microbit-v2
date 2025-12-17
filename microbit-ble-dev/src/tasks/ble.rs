@@ -68,12 +68,14 @@ async fn connection_task<P: PacketPool>(
     let y_char = server.joystick_service.y_axis;
     let btn_a_char = server.joystick_service.button_a;
     let btn_b_char = server.joystick_service.button_b;
+    let batt_char = server.battery_service.battery_level;
 
     // Set initial values
     let _ = x_char.set(server, &512);
     let _ = y_char.set(server, &512);
     let _ = btn_a_char.set(server, &0u8);
     let _ = btn_b_char.set(server, &0u8);
+    let _ = batt_char.set(server, &100u8);
 
     info!("[BLE] Starting notification loop...");
 
@@ -104,6 +106,8 @@ async fn connection_task<P: PacketPool>(
                 let _ = btn_b_char.set(server, &data.button_b);
                 let _ = btn_a_char.notify(conn, &data.button_a).await;
                 let _ = btn_b_char.notify(conn, &data.button_b).await;
+                let _ = batt_char.set(server, &data.battery_level);
+                let _ = batt_char.notify(conn, &data.battery_level).await;
             }
         }
     }

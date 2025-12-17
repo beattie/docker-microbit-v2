@@ -15,7 +15,9 @@ use {defmt_rtt as _, panic_probe as _};
 use gatt::{CONNECTIONS_MAX, L2CAP_CHANNELS_MAX};
 
 // Import task functions from tasks module
-use tasks::{led_blink_task, joystick_read_task, button_read_task, mpsl_task, ble_runner_task, ble_app_task};
+use tasks::{
+    ble_app_task, ble_runner_task, button_read_task, joystick_read_task, led_blink_task, mpsl_task,
+};
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
