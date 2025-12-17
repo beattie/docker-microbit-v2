@@ -8,6 +8,8 @@ The `ble-advertising` project is a stepping stone to understanding BLE, while `b
 
 The branch `HID_buttons` includes reading some _buttons_ and reporting them via **BLE**.
 
+The project **microbit-ble-dev** includes the branches _micro-ble-dev-Phase1_, _micro-ble-dev-Phase2_, _micro-ble-dev-Phase3_ and _micro-ble-dev-Phase4_ which include changes exclusively in this project. This project covers the process of developing a _HID Jotstick_ using a **micro:bit + joystick:bit** and is intended as an educational project with an exploration of _generative AI_.
+
 ## 🐳 Quick Start
 🖥️ Ubuntu Host Requirements
 ```bash
