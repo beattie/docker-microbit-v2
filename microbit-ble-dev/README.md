@@ -2,7 +2,10 @@
 
 A hands-on learning project for exploring Bluetooth Low Energy (BLE) and GATT features using Rust on the micro:bit v2. This project extends the ble-joystick foundation to demonstrate advanced BLE concepts through progressive implementation phases.
 
-Much of the work in this project was driven by AI, specifically, Claude Code by Anthropic. One of the goals was to learn what AI could do. My primary goal had been to learn BLE and Rust. Unfortunately that did not work out and Claude actually did most of the work, I do hope to be able to go back over the code and the various phases to educate my self.
+Much of the work in this project was performed by AI, specifically, Claude Code by Anthropic. One of the goals was to learn what AI could do. My primary goal had been to learn BLE and Rust. 
+Unfortunately that did not work out and Claude actually did most of the work so that I missed out of the process of working through the process. I think I had hoped the process would be similar to a lecture, I did not find this to be the case. I found out what AI could do, I did not learn much about Rust and BLE.
+
+I do hope to be able to go back over the code and the various phases to educate my self.
 
 ## 🎯 Project Purpose
 
